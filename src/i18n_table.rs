@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 289] = [
+pub static TABLE: [[&str; 5]; 297] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -292,4 +292,12 @@ pub static TABLE: [[&str; 5]; 289] = [
     ["Lavande", "Lavender", "Lavanda", "Lavendel", "薰衣草"],
     ["4K · 3840 px", "4K · 3840 px", "4K · 3840 px", "4K · 3840 px", "4K · 3840 px"],
     ["Variables : {window} nom de la fenêtre · {date} · {time} · {res} résolution · {n} numéro.", "Variables: {window} window name · {date} · {time} · {res} resolution · {n} number.", "Variables: {window} nombre de la ventana · {date} · {time} · {res} resolución · {n} número.", "Variablen: {window} Fenstername · {date} · {time} · {res} Auflösung · {n} Nummer.", "变量：{window} 窗口名称 · {date} · {time} · {res} 分辨率 · {n} 编号。"],
+    ["Annuler|modif", "Undo", "Deshacer", "Rückgängig", "撤销"],
+    ["Rétablir", "Redo", "Rehacer", "Wiederholen", "重做"],
+    ["Rétablir (Ctrl+Y)", "Redo (Ctrl+Y)", "Rehacer (Ctrl+Y)", "Wiederholen (Strg+Y)", "重做（Ctrl+Y）"],
+    ["Tout sélectionner", "Select all", "Seleccionar todo", "Alles auswählen", "全选"],
+    ["Tout désélectionner", "Deselect all", "Deseleccionar todo", "Alle abwählen", "取消全选"],
+    ["Sélectionner toutes les captures affichées (Ctrl+A)", "Select all displayed screenshots (Ctrl+A)", "Seleccionar todas las capturas mostradas (Ctrl+A)", "Alle angezeigten Aufnahmen auswählen (Strg+A)", "选择所有显示的截图（Ctrl+A）"],
+    ["Ouvrir le dossier", "Open folder", "Abrir carpeta", "Ordner öffnen", "打开文件夹"],
+    ["Ouvrir le dossier des captures dans l'Explorateur", "Open the screenshots folder in File Explorer", "Abrir la carpeta de capturas en el Explorador", "Aufnahmeordner im Explorer öffnen", "在资源管理器中打开截图文件夹"],
 ];

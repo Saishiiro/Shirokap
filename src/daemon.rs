@@ -17,12 +17,12 @@ use tray_icon::{
     Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent,
 };
 use windows_sys::Win32::{
-    Foundation::{GetLastError, POINT, RECT},
+    Foundation::{CloseHandle, GetLastError, POINT, RECT},
     Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS},
-    System::Threading::CreateMutexW,
+    System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION},
     UI::WindowsAndMessaging::{
-        AllowSetForegroundWindow, FindWindowW, GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowTextW, SetForegroundWindow,
-        ShowWindow, SW_RESTORE,
+        AllowSetForegroundWindow, EnumWindows, FindWindowW, GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowTextW,
+        GetWindowThreadProcessId, IsWindowVisible, PostMessageW, SetForegroundWindow, ShowWindow, SW_RESTORE, WM_CLOSE,
     },
 };
 
@@ -424,6 +424,74 @@ fn open_popup(child: &mut Option<Child>, x: i32, y: i32, paused: bool, auto: boo
     }
 }
 
+/// Chemin complet de l'exécutable d'un processus (en minuscules), ou None si inaccessible.
+fn exe_of(pid: u32) -> Option<String> {
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if h.is_null() {
+            return None;
+        }
+        let mut buf = [0u16; 1024];
+        let mut n = buf.len() as u32;
+        let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, buf.as_mut_ptr(), &mut n);
+        CloseHandle(h);
+        if ok == 0 {
+            return None;
+        }
+        Some(String::from_utf16_lossy(&buf[..n as usize]).to_lowercase())
+    }
+}
+
+/// Fenêtres visibles des autres processus Shirokap (galerie, zone, captures épinglées…).
+struct Scan {
+    me: String,
+    my_pid: u32,
+    ours: HashMap<u32, bool>,
+    wins: Vec<*mut c_void>,
+}
+
+unsafe extern "system" fn scan_window(h: *mut c_void, lp: isize) -> i32 {
+    let s = &mut *(lp as *mut Scan);
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(h, &mut pid);
+    if pid != 0 && pid != s.my_pid && IsWindowVisible(h) != 0 {
+        let me = s.me.clone();
+        let ours = *s.ours.entry(pid).or_insert_with(|| exe_of(pid).as_deref() == Some(me.as_str()));
+        if ours {
+            s.wins.push(h);
+        }
+    }
+    1 // continuer l'énumération
+}
+
+/// « Quitter » ferme toute l'appli : on demande poliment aux fenêtres de se fermer (comme le bouton ✕,
+/// la galerie enregistre donc son état), puis on arrête au bout de 2 s celles qu'on a lancées et qui traînent.
+fn close_app_windows(children: &mut [&mut Option<Child>]) {
+    let me = std::env::current_exe().map(|p| p.display().to_string().to_lowercase()).unwrap_or_default();
+    if !me.is_empty() {
+        let mut s = Scan { me, my_pid: std::process::id(), ours: HashMap::new(), wins: Vec::new() };
+        unsafe {
+            EnumWindows(Some(scan_window), &mut s as *mut Scan as isize);
+            for &h in &s.wins {
+                PostMessageW(h, WM_CLOSE, 0, 0);
+            }
+        }
+    }
+    let deadline = Instant::now() + Duration::from_secs(2);
+    for c in children.iter_mut() {
+        while running(c) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        if running(c) {
+            if let Some(ch) = c.as_mut() {
+                let _ = ch.kill();
+                log("a window did not close in time when quitting: process stopped");
+            }
+        }
+        **c = None;
+    }
+}
+
 fn parse_cmd(t: &str) -> Option<Cmd> {
     Some(match t.trim() {
         "gallery" => Cmd::Gallery,
@@ -729,7 +797,11 @@ pub fn run() {
                     let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent })));
                     let _ = tray.set_tooltip(Some(tooltip(&cfg, &keys, paused, auto_on)));
                 }
-                Cmd::Quit => *flow = ControlFlow::Exit,
+                Cmd::Quit => {
+                    close_app_windows(&mut [&mut gallery, &mut region, &mut popup]);
+                    log("quit from the tray menu");
+                    *flow = ControlFlow::Exit;
+                }
                 Cmd::TogClip | Cmd::TogSound | Cmd::TogFlash | Cmd::TogFolder | Cmd::Res(_) => {
                     match cmd {
                         Cmd::TogClip => cfg.clipboard = !cfg.clipboard,

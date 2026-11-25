@@ -4,6 +4,19 @@
 
 ## English
 
+### 1.1.0 — November 2026
+
+**Gallery**
+- "Select all" button (becomes "Deselect all" when everything shown is selected).
+- "Open folder" button: opens the screenshots folder (or the filtered subfolder) in File Explorer.
+
+**Editor**
+- "Redo" button next to "Undo", also with Ctrl+Y or Ctrl+Shift+Z.
+- The "Undo" button was labeled "Cancel" in English and is now correct.
+
+**Tray**
+- "Quit" now closes the whole app: gallery, region capture and pinned screenshots too.
+
 ### 1.0.0 — November 2026
 
 First stable release.
@@ -63,6 +76,19 @@ First stable release.
 ---
 
 ## Français
+
+### 1.1.0 — novembre 2026
+
+**Galerie**
+- Bouton « Tout sélectionner » (devient « Tout désélectionner » quand tout ce qui est affiché est sélectionné).
+- Bouton « Ouvrir le dossier » : ouvre le dossier des captures (ou le sous-dossier filtré) dans l'Explorateur.
+
+**Éditeur**
+- Bouton « Rétablir » à côté d'« Annuler », aussi avec Ctrl+Y ou Ctrl+Maj+Z.
+- Le bouton « Annuler » s'affichait « Cancel » en anglais au lieu de « Undo » : corrigé.
+
+**Tray**
+- « Quitter » ferme maintenant toute l'appli : la galerie, la capture de zone et les captures épinglées aussi.
 
 ### 1.0.0 — novembre 2026
 

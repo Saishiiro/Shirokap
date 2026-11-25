@@ -66,6 +66,7 @@ pub struct Editor {
     base: RgbaImage, // image + toutes les annotations déjà appliquées (ce qu'on voit à l'écran)
     tex: egui::TextureHandle,
     ops: Vec<Op>,
+    redo: Vec<Op>, // annotations annulées, qu'on peut rétablir
     cur: Option<Op>,
     tool: Tool,
     shape: ShapeKind,
@@ -480,6 +481,7 @@ impl Editor {
             img,
             tex,
             ops: Vec::new(),
+            redo: Vec::new(),
             cur: None,
             tool: Tool::Pen,
             shape: ShapeKind::Rect,
@@ -542,6 +544,7 @@ impl Editor {
             self.upload_full();
         }
         self.ops.push(op);
+        self.redo.clear(); // une nouvelle annotation remplace ce qu'on aurait pu rétablir
     }
 
     /// Recalcule l'image depuis l'original en rejouant toutes les annotations.
@@ -554,8 +557,18 @@ impl Editor {
     }
 
     fn undo(&mut self) {
-        if self.ops.pop().is_some() {
+        if let Some(op) = self.ops.pop() {
+            self.redo.push(op);
             self.rebuild();
+        }
+    }
+
+    /// Remet la dernière annotation annulée.
+    fn redo(&mut self) {
+        if let Some(op) = self.redo.pop() {
+            apply(&mut self.base, &self.img, &op);
+            self.upload_full();
+            self.ops.push(op);
         }
     }
 
@@ -575,6 +588,7 @@ impl Editor {
         let mut exit = Exit::None;
         let mut save: Option<bool> = None; // Some(false) = copie, Some(true) = remplacer l'original
         let mut undo = false;
+        let mut redo = false;
         ui.horizontal_wrapped(|ui| {
             if ui.button(tr("← Fermer")).clicked() {
                 exit = Exit::Close;
@@ -619,8 +633,11 @@ impl Editor {
                 }
             }
             ui.separator();
-            if ui.add_enabled(!self.ops.is_empty(), egui::Button::new(tr("Annuler"))).on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
+            if ui.add_enabled(!self.ops.is_empty(), egui::Button::new(tr("Annuler|modif"))).on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
                 undo = true;
+            }
+            if ui.add_enabled(!self.redo.is_empty(), egui::Button::new(tr("Rétablir"))).on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
+                redo = true;
             }
             if ui.button(tr("Copier")).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
                 copy_to_clipboard(&self.render());
@@ -638,11 +655,20 @@ impl Editor {
                 }
             });
         });
-        if ui.input(|i| i.modifiers.command && i.key_pressed(Key::Z)) && self.pending.is_none() {
-            undo = true;
+        if self.pending.is_none() {
+            // Ctrl+Z : annuler · Ctrl+Y ou Ctrl+Maj+Z : rétablir
+            let (z, y, shift) = ui.input(|i| (i.modifiers.command && i.key_pressed(Key::Z), i.modifiers.command && i.key_pressed(Key::Y), i.modifiers.shift));
+            if z && !shift {
+                undo = true;
+            }
+            if y || (z && shift) {
+                redo = true;
+            }
         }
         if undo {
             self.undo();
+        } else if redo {
+            self.redo();
         }
 
         // saisie du texte à l'emplacement cliqué

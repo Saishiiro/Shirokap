@@ -92,6 +92,27 @@ impl App {
             if ui.button(tr("Actualiser")).clicked() {
                 self.items = list_items(&self.cfg.save_dir);
             }
+            // tout sélectionner (ou tout désélectionner si tout est déjà sélectionné)
+            let all_picked = !vis.is_empty() && vis.iter().all(|&i| self.sel.contains(&self.items[i].path));
+            if all_picked {
+                if ui.button(tr("Tout désélectionner")).clicked() {
+                    self.sel.clear();
+                }
+            } else if ui
+                .add_enabled(!vis.is_empty(), egui::Button::new(tr("Tout sélectionner")))
+                .on_hover_text(tr("Sélectionner toutes les captures affichées (Ctrl+A)"))
+                .clicked()
+            {
+                self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect();
+            }
+            // dossier des captures (ou le sous-dossier filtré) dans l'Explorateur
+            if ui.button(tr("Ouvrir le dossier")).on_hover_text(tr("Ouvrir le dossier des captures dans l'Explorateur")).clicked() {
+                let root = Path::new(&self.cfg.save_dir);
+                let dir = if self.folder.is_empty() { root.to_path_buf() } else { root.join(&self.folder) };
+                let dir = if dir.is_dir() { dir } else { root.to_path_buf() };
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = Command::new("explorer").arg(&dir).spawn();
+            }
         });
         });
 

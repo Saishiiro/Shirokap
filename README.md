@@ -42,13 +42,13 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 - Delay before capture, timelapse, blocklist of sensitive windows, automatic cleanup of old screenshots.
 
 **Gallery**
-- Grid of rounded thumbnails grouped by day, with search, sorting, favorites, multi-selection and drag and drop to import images.
+- Grid of rounded thumbnails grouped by day, with search, sorting, favorites, multi-selection (with select all), quick access to the folder and drag and drop to import images.
 - Viewer (zoom, slideshow, fullscreen), slider comparison, statistics.
 - Collapsible side menu (Ctrl+B), 12 themes and a customizable accent color.
 
 **Annotation editor**
 - Pen, shapes (rectangle, ellipse, line, arrows…), highlighter, blur, text, numbered steps, eraser.
-- Preview faithful to the final result, unlimited undo, save as a copy or replace the original.
+- Preview faithful to the final result, unlimited undo and redo, save as a copy or replace the original.
 
 **Languages**
 - English and French, plus Spanish, German and Chinese (unreviewed translations).
@@ -171,13 +171,13 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 - Délai avant capture, timelapse, liste noire de fenêtres sensibles, rangement automatique des vieilles captures.
 
 **Galerie**
-- Grille de miniatures arrondies, regroupées par jour, avec recherche, tri, favoris, sélection multiple et glisser-déposer pour importer des images.
+- Grille de miniatures arrondies, regroupées par jour, avec recherche, tri, favoris, sélection multiple (avec « Tout sélectionner »), accès direct au dossier et glisser-déposer pour importer des images.
 - Visionneuse (zoom, diaporama, plein écran), comparateur à curseur, statistiques.
 - Menu latéral réductible (Ctrl+B), 12 thèmes et couleur d'accent personnalisable.
 
 **Éditeur d'annotations**
 - Stylo, formes (rectangle, ellipse, ligne, flèches…), surligneur, flou, texte, étapes numérotées, gomme.
-- Aperçu fidèle au résultat final, annulation illimitée, enregistrement en copie ou remplacement de l'original.
+- Aperçu fidèle au résultat final, annulation et rétablissement illimités, enregistrement en copie ou remplacement de l'original.
 
 **Langues**
 - Français et anglais, plus espagnol, allemand et chinois (traductions non vérifiées).
