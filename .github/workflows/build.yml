@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Compile
+        run: cargo build --release
+      - name: Copy exe
+        run: copy target\release\shirokap.exe shirokap.exe
+      - name: Installer
+        shell: cmd
+        run: |
+          choco install innosetup -y --no-progress
+          for /f "tokens=3 delims= " %%v in ('findstr /b /c:"version = " Cargo.toml') do (set VER=%%~v& goto :found)
+          :found
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%VER% installer\Shirokap.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Shirokap
+          path: |
+            shirokap.exe
+            dist/*.exe

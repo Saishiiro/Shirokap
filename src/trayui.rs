@@ -1,0 +1,347 @@
+//! Menu « moderne » de l'icône du tray : une petite fenêtre dessinée aux couleurs de l'appli
+//! (police Inter, coins arrondis, thème). La commande choisie est déposée dans un fichier que le démon lit.
+use crate::common::*;
+use crate::i18n::*;
+use crate::gallery::ui_kit::{accent, apply_style, install_fonts, palette, Pal};
+use eframe::egui::{self, pos2, vec2, Align2, Color32, FontId, Rect, Sense, Stroke};
+use std::time::{Duration, Instant};
+use windows_sys::Win32::{
+    Foundation::{POINT, RECT},
+    Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST},
+    UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow, SetWindowPos, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW},
+};
+
+const MARGIN: f32 = 14.0; // espace transparent autour des cartes (ombre)
+const CARD_W: f32 = 276.0;
+const FLY_W: f32 = 306.0; // largeur du sous-menu
+const GAP: f32 = 8.0;
+const PAD: f32 = 8.0;
+const ROW_H: f32 = 34.0;
+const SEP_H: f32 = 11.0;
+const INFO_H: f32 = 26.0;
+
+enum It {
+    Info(String),
+    Sep,
+    Act { id: String, label: String, hint: String, checked: Option<bool> },
+    Sub { label: String, kids: Vec<It> },
+}
+
+fn item_h(it: &It) -> f32 {
+    match it {
+        It::Info(_) => INFO_H,
+        It::Sep => SEP_H,
+        _ => ROW_H,
+    }
+}
+
+fn card_h(items: &[It]) -> f32 {
+    items.iter().map(item_h).sum::<f32>() + 2.0 * PAD
+}
+
+/// Même contenu et mêmes commandes que le menu natif.
+fn model(cfg: &Config, paused: bool, auto: bool) -> Vec<It> {
+    let act = |id: &str, label: &str, hint: &str| It::Act {
+        id: id.to_string(),
+        label: label.to_string(),
+        hint: hint.to_string(),
+        checked: None,
+    };
+    let chk = |id: &str, label: &str, on: bool| It::Act {
+        id: id.to_string(),
+        label: label.to_string(),
+        hint: String::new(),
+        checked: Some(on),
+    };
+    let today = today_label(today_count(cfg));
+    let mut quick = vec![
+        chk("tog_clip", tr("Copier dans le presse-papiers"), cfg.clipboard),
+        chk("tog_sound", tr("Bip sonore"), cfg.sound),
+        chk("tog_flash", tr("Clignotement de l'icône"), cfg.flash),
+        chk("tog_folder", tr("Un dossier par fenêtre / jeu"), cfg.folder_per_window),
+        It::Sep,
+    ];
+    for (w, l) in [
+        (0u32, tr("Résolution native")),
+        (3840, "4K · 3840 px"),
+        (2560, "1440p · 2560 px"),
+        (1920, "1080p · 1920 px"),
+        (1280, "720p · 1280 px"),
+    ] {
+        quick.push(chk(&format!("res:{w}"), l, cfg.target_width == w));
+    }
+    vec![
+        It::Info(format!("Shirokap {}", env!("CARGO_PKG_VERSION"))),
+        It::Info(today),
+        It::Sep,
+        It::Sub {
+            label: tr("Capturer").to_string(),
+            kids: vec![
+                act("snap", tr("Écran entier"), &cfg.hotkey),
+                act("zone", tr("Zone…"), &cfg.hotkey_region),
+                act("zone_clip", tr("Zone → presse-papiers"), &cfg.hotkey_region_clip),
+                act("snap_last", tr("Refaire la dernière zone"), &cfg.hotkey_last_region),
+                It::Sep,
+                act("delayed_screen", tr("Écran dans 5 secondes"), ""),
+                act("delayed_window", tr("Fenêtre active dans 5 secondes"), ""),
+                It::Sep,
+                act("pick", tr("Pipette : couleur sous le curseur (3 s)"), &cfg.hotkey_picker),
+            ],
+        },
+        chk("auto", tr("Capture automatique (timelapse)"), auto),
+        It::Sep,
+        act("gallery", tr("Ouvrir la galerie"), &cfg.hotkey_gallery),
+        It::Sub {
+            label: tr("Dernière capture").to_string(),
+            kids: vec![
+                act("last", tr("Ouvrir"), ""),
+                act("copy_last", tr("Copier dans le presse-papiers"), ""),
+                act("pin_last", tr("Épingler à l'écran"), ""),
+                It::Sep,
+                act("trash_last", tr("Mettre à la corbeille"), ""),
+            ],
+        },
+        It::Sub {
+            label: tr("Dossiers").to_string(),
+            kids: vec![act("folder", tr("Dossier des captures"), ""), act("config_dir", tr("Dossier de configuration"), "")],
+        },
+        It::Sep,
+        It::Sub { label: tr("Réglages rapides").to_string(), kids: quick },
+        chk("pause", tr("Suspendre les raccourcis"), paused),
+        act("settings", tr("Paramètres…"), ""),
+        It::Sep,
+        act("quit", tr("Quitter"), ""),
+    ]
+}
+
+#[derive(Default)]
+struct Out {
+    chosen: Option<String>,
+    hover_sub: Option<usize>,
+    hover_plain: bool,
+}
+
+fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It], salt: &str, active_sub: Option<usize>, out: &mut Out) {
+    let p = ui.painter();
+    let shadow = egui::epaint::Shadow { offset: vec2(0.0, 5.0), blur: 20.0, spread: 0.0, color: Color32::from_black_alpha(100) };
+    p.add(shadow.as_shape(rect, 12.0));
+    p.rect_filled(rect, 12.0, pal.card);
+    p.rect_stroke(rect, 12.0, Stroke::new(1.0_f32, pal.line));
+    let has_check = items.iter().any(|i| matches!(i, It::Act { checked: Some(_), .. }));
+    let gutter = if has_check { 32.0 } else { 14.0 };
+    let t = pal.text;
+    let weak = Color32::from_rgba_unmultiplied(t.r(), t.g(), t.b(), 135);
+    let mut y = rect.min.y + PAD;
+    for (n, it) in items.iter().enumerate() {
+        let h = item_h(it);
+        let row = Rect::from_min_size(pos2(rect.min.x + PAD, y), vec2(rect.width() - 2.0 * PAD, h));
+        match it {
+            It::Sep => {
+                let ly = row.center().y;
+                p.line_segment([pos2(row.min.x + 6.0, ly), pos2(row.max.x - 6.0, ly)], Stroke::new(1.0_f32, pal.line));
+            }
+            It::Info(text) => {
+                p.text(pos2(row.min.x + 14.0, row.center().y), Align2::LEFT_CENTER, text, FontId::proportional(12.5), weak);
+            }
+            It::Act { id, label, hint, checked } => {
+                let resp = ui.interact(row, egui::Id::new((salt, n)), Sense::click());
+                if resp.hovered() {
+                    p.rect_filled(row, 8.0, pal.hover);
+                    out.hover_plain = true;
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if *checked == Some(true) {
+                    let c = pos2(row.min.x + 16.0, row.center().y);
+                    let st = Stroke::new(2.0_f32, acc);
+                    p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
+                    p.line_segment([c + vec2(-1.5, 3.5), c + vec2(4.5, -3.5)], st);
+                }
+                p.text(pos2(row.min.x + gutter, row.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), t);
+                if !hint.is_empty() {
+                    p.text(pos2(row.max.x - 12.0, row.center().y), Align2::RIGHT_CENTER, hint, FontId::proportional(12.0), weak);
+                }
+                if resp.clicked() {
+                    out.chosen = Some(id.clone());
+                }
+            }
+            It::Sub { label, .. } => {
+                let resp = ui.interact(row, egui::Id::new((salt, n)), Sense::click());
+                if resp.hovered() || active_sub == Some(n) {
+                    p.rect_filled(row, 8.0, pal.hover);
+                }
+                if resp.hovered() {
+                    out.hover_sub = Some(n);
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                p.text(pos2(row.min.x + gutter, row.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), t);
+                let c = pos2(row.max.x - 16.0, row.center().y);
+                let st = Stroke::new(1.7_f32, t);
+                p.line_segment([c + vec2(-2.5, -4.5), c + vec2(2.0, 0.0)], st);
+                p.line_segment([c + vec2(2.0, 0.0), c + vec2(-2.5, 4.5)], st);
+            }
+        }
+        y += h;
+    }
+}
+
+struct Popup {
+    items: Vec<It>,
+    pal: Pal,
+    acc: Color32,
+    pos: (i32, i32),
+    win: (f32, f32),
+    placed: bool,
+    start: Instant,
+    had_focus: bool,
+    open_sub: Option<usize>,
+    fly_rect: Option<Rect>,
+}
+
+pub fn run(x: i32, y: i32, paused: bool, auto: bool) {
+    let cfg = Config::load();
+    let items = model(&cfg, paused, auto);
+    let main_h = card_h(&items);
+    let fly_h = items
+        .iter()
+        .filter_map(|i| if let It::Sub { kids, .. } = i { Some(card_h(kids)) } else { None })
+        .fold(0.0_f32, f32::max);
+    let win = (MARGIN * 2.0 + FLY_W + GAP + CARD_W, MARGIN * 2.0 + main_h.max(fly_h));
+    let opts = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([win.0, win.1])
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_always_on_top()
+            .with_taskbar(false)
+            .with_title("Shirokap menu"),
+        ..Default::default()
+    };
+    let _ = eframe::run_native(
+        "Shirokap menu",
+        opts,
+        Box::new(move |cc| {
+            install_fonts(&cc.egui_ctx);
+            apply_style(&cc.egui_ctx, &cfg);
+            Ok(Box::new(Popup {
+                items,
+                pal: palette(&cfg.theme),
+                acc: accent(&cfg),
+                pos: (x, y),
+                win,
+                placed: false,
+                start: Instant::now(),
+                had_focus: false,
+                open_sub: None,
+                fly_rect: None,
+            }))
+        }),
+    );
+}
+
+impl Popup {
+    /// Place la fenêtre près de l'icône (au-dessus de la barre des tâches), dans la zone utile de l'écran.
+    fn place(&self, ctx: &egui::Context) {
+        let ppp = ctx.pixels_per_point();
+        let (w, h) = ((self.win.0 * ppp) as i32, (self.win.1 * ppp) as i32);
+        let m = (MARGIN * ppp) as i32;
+        let (cx, cy) = self.pos;
+        let zero = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, rcMonitor: zero, rcWork: zero, dwFlags: 0 };
+        unsafe {
+            let hm = MonitorFromPoint(POINT { x: cx, y: cy }, MONITOR_DEFAULTTONEAREST);
+            GetMonitorInfoW(hm, &mut mi);
+        }
+        let work = mi.rcWork;
+        let px = |v: f32| (v * ppp) as i32;
+        // bord droit de la carte principale : à droite de l'icône, sans dépasser de l'écran
+        let card_right = (cx + px(24.0)).min(work.right - px(8.0));
+        let x = (card_right + m - w).max(work.left - m);
+        let y = if cy > (work.top + work.bottom) / 2 {
+            let card_bottom = (cy - px(4.0)).min(work.bottom - px(8.0));
+            card_bottom + m - h
+        } else {
+            let card_top = (cy + px(8.0)).max(work.top + px(8.0));
+            card_top - m
+        };
+        let y = y.max(work.top - m);
+        let title: Vec<u16> = "Shirokap menu".encode_utf16().chain([0]).collect();
+        unsafe {
+            let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+            if !hwnd.is_null() {
+                SetWindowPos(hwnd, std::ptr::null_mut(), x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                SetForegroundWindow(hwnd);
+            }
+        }
+    }
+}
+
+impl eframe::App for Popup {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        [0.0, 0.0, 0.0, 0.0] // fenêtre transparente : seules les cartes arrondies sont visibles
+    }
+
+    fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
+        if !self.placed {
+            self.placed = true;
+            self.place(ctx);
+            ctx.request_repaint();
+            return; // rien n'est dessiné avant le placement (pas de clignotement)
+        }
+        let (esc, focused, click, pos) = ctx.input(|i| {
+            (i.key_pressed(egui::Key::Escape), i.focused, i.pointer.any_click(), i.pointer.interact_pos())
+        });
+        if focused {
+            self.had_focus = true;
+        }
+        let age = self.start.elapsed().as_millis();
+        // fermeture : Échap, clic ailleurs (perte du focus), ou jamais activé
+        if esc || (self.had_focus && !focused && age > 250) || (!self.had_focus && age > 2500) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
+        ctx.request_repaint_after(Duration::from_millis(100));
+
+        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
+            let full = ui.max_rect();
+            let main_h = card_h(&self.items);
+            let main = Rect::from_min_size(pos2(full.max.x - MARGIN - CARD_W, full.max.y - MARGIN - main_h), vec2(CARD_W, main_h));
+            let hover = ctx.input(|i| i.pointer.hover_pos());
+            let mut out = Out::default();
+            draw_card(ui, &self.pal, self.acc, main, &self.items, "main", self.open_sub, &mut out);
+
+            // sous-menu : ouvert au survol d'une ligne à flèche, conservé tant que la souris est dessus
+            let over_fly = match (self.fly_rect, hover) {
+                (Some(r), Some(p)) => r.contains(p),
+                _ => false,
+            };
+            if let Some(n) = out.hover_sub {
+                self.open_sub = Some(n);
+            } else if out.hover_plain && !over_fly {
+                self.open_sub = None;
+            }
+            self.fly_rect = None;
+            if let Some(n) = self.open_sub {
+                if let Some(It::Sub { kids, .. }) = self.items.get(n) {
+                    let row_y = main.min.y + PAD + self.items[..n].iter().map(item_h).sum::<f32>();
+                    let fh = card_h(kids);
+                    let top = (row_y - PAD).clamp(full.min.y + MARGIN, (full.max.y - MARGIN - fh).max(full.min.y + MARGIN));
+                    let fr = Rect::from_min_size(pos2(main.min.x - GAP - FLY_W, top), vec2(FLY_W, fh));
+                    draw_card(ui, &self.pal, self.acc, fr, kids, &format!("fly{n}"), None, &mut out);
+                    self.fly_rect = Some(fr);
+                }
+            }
+
+            if let Some(id) = out.chosen.take() {
+                let _ = std::fs::write(popup_cmd_path(), id);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            } else if click {
+                if let Some(p) = pos {
+                    let inside = main.contains(p) || self.fly_rect.map(|r| r.contains(p)).unwrap_or(false);
+                    if !inside {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
+                }
+            }
+        });
+    }
+}

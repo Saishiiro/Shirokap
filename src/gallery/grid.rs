@@ -1,0 +1,394 @@
+// Grille de miniatures de la galerie.
+use super::*;
+
+impl App {
+    // ----- galerie -----
+    pub(super) fn gallery_ui(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        // glisser-déposer : on importe les images déposées sur la fenêtre
+        let dropped: Vec<PathBuf> =
+            ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
+        if !dropped.is_empty() {
+            let n = dropped.iter().filter(|p| import_file(&self.cfg, p)).count();
+            self.items = list_items(&self.cfg.save_dir);
+            self.status = trf("{0} image(s) importée(s)", &[&n]);
+        }
+        if let Some(ed) = &mut self.editor {
+            match ed.ui(ui) {
+                editor::Exit::None => {}
+                editor::Exit::Close => self.editor = None,
+                editor::Exit::Saved(p) => {
+                    self.thumbs.remove(&p);
+                    self.full = None;
+                    self.items = list_items(&self.cfg.save_dir);
+                    self.view = self.items.iter().position(|i| i.path == p);
+                    self.editor = None;
+                    self.status = tr("Image enregistrée").into();
+                }
+            }
+            return;
+        }
+        if self.compare.is_some() {
+            self.compare_ui(ui);
+            return;
+        }
+        let vis = self.visible();
+        self.stat = (vis.len(), vis.iter().map(|&i| self.items[i].size).sum());
+        if let Some(v) = self.view {
+            self.viewer(ui, &ctx, &vis, v);
+            return;
+        }
+
+        self.slideshow = false;
+        if !ctx.wants_keyboard_input() {
+            let (all, del, esc) = ctx.input(|i| {
+                (i.modifiers.command && i.key_pressed(Key::A), i.key_pressed(Key::Delete), i.key_pressed(Key::Escape))
+            });
+            if all {
+                self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect(); // Ctrl+A
+            }
+            if esc {
+                self.sel.clear();
+            }
+            if del && !self.sel.is_empty() {
+                let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
+                self.trash(v);
+                ctx.request_repaint();
+                return;
+            }
+        }
+
+        let mut folders: Vec<String> = self.items.iter().map(|i| i.folder.clone()).filter(|f| !f.is_empty()).collect();
+        folders.sort();
+        folders.dedup();
+        ui.scope(|ui| {
+        // marge à droite + curseur plus court : la barre passe à la ligne au lieu de déborder
+        ui.set_max_width((ui.available_width() - 20.0).max(200.0));
+        ui.spacing_mut().slider_width = 120.0;
+        ui.horizontal_wrapped(|ui| {
+            ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(tr("Rechercher…")).desired_width(240.0));
+            let shown = if self.folder.is_empty() { tr("Tous les dossiers").to_string() } else { self.folder.clone() };
+            egui::ComboBox::new("folder", "").selected_text(shown).show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.folder, String::new(), tr("Tous les dossiers"));
+                for f in &folders {
+                    ui.selectable_value(&mut self.folder, f.clone(), f);
+                }
+            });
+            let sort_name = match self.sort {
+                Sort::Newest => tr("Plus récentes"),
+                Sort::Oldest => tr("Plus anciennes"),
+                Sort::Name => tr("Nom"),
+                Sort::Size => tr("Taille"),
+            };
+            egui::ComboBox::new("sort", "").selected_text(sort_name).show_ui(ui, |ui| {
+                ui.selectable_value(&mut self.sort, Sort::Newest, tr("Plus récentes"));
+                ui.selectable_value(&mut self.sort, Sort::Oldest, tr("Plus anciennes"));
+                ui.selectable_value(&mut self.sort, Sort::Name, tr("Nom"));
+                ui.selectable_value(&mut self.sort, Sort::Size, tr("Taille"));
+            });
+            ui.toggle_value(&mut self.favs_only, tr("★ Favoris"));
+            ui.weak(tr("Taille"));
+            ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false));
+            if ui.button(tr("Actualiser")).clicked() {
+                self.items = list_items(&self.cfg.save_dir);
+            }
+        });
+        });
+
+        let mut acts: Vec<Act> = Vec::new();
+        if !self.sel.is_empty() {
+            ui.horizontal(|ui| {
+                ui.label(trf("{0} sélectionnée(s)", &[&self.sel.len()]));
+                if self.sel.len() == 2 && ui.button(tr("Comparer")).clicked() {
+                    acts.push(Act::Compare);
+                }
+                if ui.button(tr("Copier les fichiers")).clicked() {
+                    acts.push(Act::CopyFiles);
+                }
+                if ui.button(tr("Exporter…")).clicked() {
+                    acts.push(Act::Export);
+                }
+                if ui.button(tr("★ Favori")).clicked() {
+                    for p in self.sel.clone() {
+                        acts.push(Act::Fav(p));
+                    }
+                }
+                if ui.button(tr("Corbeille")).clicked() {
+                    acts.push(Act::Trash(self.sel.iter().cloned().collect()));
+                }
+                if ui.button(tr("Désélectionner")).clicked() {
+                    self.sel.clear();
+                }
+            });
+        }
+        ui.separator();
+
+        // regroupement par jour (si le tri est par date)
+        let by_date = matches!(self.sort, Sort::Newest | Sort::Oldest);
+        let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+        for &i in &vis {
+            let label = if by_date { day_label(self.items[i].modified) } else { String::new() };
+            if groups.last().map(|g| g.0 == label).unwrap_or(false) {
+                groups.last_mut().unwrap().1.push(i);
+            } else {
+                groups.push((label, vec![i]));
+            }
+        }
+        if vis.is_empty() {
+            ui.add_space(30.0);
+            ui.vertical_centered(|ui| {
+                ui.heading(tr("Aucune capture"));
+                ui.label(trf("Appuie sur {0} pour capturer : tes captures apparaîtront ici.", &[&self.cfg.hotkey]));
+            });
+        }
+
+        let acc = accent(&self.cfg);
+        let ctrl = ctx.input(|i| i.modifiers.command || i.modifiers.ctrl);
+        let selecting = !self.sel.is_empty();
+        // la grille remplit toute la largeur : le nombre de colonnes dépend de la taille souhaitée
+        let gap = 12.0_f32;
+        let avail = (ui.available_width() - 14.0).max(120.0);
+        let cols = ((avail + gap) / (self.thumb_w + gap)).floor().max(1.0);
+        let cw = ((avail - gap * (cols - 1.0)) / cols).floor();
+        let ch = (cw * 9.0 / 16.0).floor();
+        let mut loads = 0;
+        egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+            for (label, idxs) in &groups {
+                if !label.is_empty() {
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.label(bold_text(label, 16.0));
+                        ui.weak(n_captures(idxs.len()));
+                    });
+                }
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(gap, gap);
+                    for &i in idxs {
+                        let (rect, resp) = ui.allocate_exact_size(vec2(cw, ch), Sense::click());
+                        if !ui.is_rect_visible(rect) {
+                            continue; // chargement paresseux : seulement ce qu'on voit
+                        }
+                        let path = self.items[i].path.clone();
+                        let modified = self.items[i].modified;
+                        let folder = self.items[i].folder.clone();
+                        if !self.thumbs.contains_key(&path) && loads < 3 {
+                            loads += 1;
+                            let t = load_thumb(&ctx, &path);
+                            self.thumbs.insert(path.clone(), t);
+                        }
+                        let fav = self.favs.contains(&path);
+                        let picked = self.sel.contains(&path);
+                        let hov = ui.rect_contains_pointer(rect);
+                        let dt = chrono::DateTime::<chrono::Local>::from(modified);
+                        let when = if by_date { dt.format("%H:%M").to_string() } else { dt.format(&format!("{} %H:%M", dfmt(false))).to_string() };
+                        let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                        let full_name = if folder.is_empty() { file_name(&path) } else { format!("{folder}/{}", file_name(&path)) };
+                        let resp = resp.on_hover_text(full_name);
+                        if hov {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+
+                        // --- miniature arrondie + bandeau d'info ---
+                        let rnd = 8.0_f32;
+                        let p = ui.painter();
+                        p.rect_filled(rect, rnd, ui.visuals().faint_bg_color);
+                        if let Some(Some(t)) = self.thumbs.get(&path) {
+                            egui::Image::new(egui::load::SizedTexture::new(t.id(), rect.size()))
+                                .rounding(rnd)
+                                .paint_at(ui, rect);
+                        }
+                        let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 24.0), rect.max);
+                        let bar_r = Rounding { nw: 0.0, ne: 0.0, sw: rnd, se: rnd };
+                        p.rect_filled(bar, bar_r, Color32::from_black_alpha(150));
+                        let time_rect = p.text(bar.right_center() - vec2(10.0, 0.0), Align2::RIGHT_CENTER, &when, FontId::proportional(12.5), Color32::from_rgba_unmultiplied(255, 255, 255, 190));
+                        let mut job = egui::text::LayoutJob::simple_singleline(name, FontId::proportional(12.5), Color32::WHITE);
+                        job.wrap.max_width = (time_rect.min.x - 10.0 - (bar.min.x + 10.0)).max(10.0);
+                        job.wrap.max_rows = 1;
+                        job.wrap.break_anywhere = true; // nom trop long : coupé avec « … »
+                        let galley = ui.fonts(|f| f.layout_job(job));
+                        p.galley(pos2(bar.min.x + 10.0, bar.center().y - galley.size().y / 2.0), galley, Color32::WHITE);
+                        if picked {
+                            p.rect_stroke(rect, rnd, Stroke::new(3.0_f32, acc));
+                        } else if hov {
+                            p.rect_stroke(rect, rnd, Stroke::new(2.0_f32, acc));
+                        }
+
+                        // --- boutons rapides au survol ---
+                        let (bg_n, bg_h) = (col(24, 26, 31), col(58, 62, 72));
+                        let bs = 28.0_f32;
+                        let r_trash = Rect::from_min_size(pos2(rect.max.x - 8.0 - bs, rect.min.y + 8.0), vec2(bs, bs));
+                        let r_copy = r_trash.translate(vec2(-(bs + 6.0), 0.0));
+                        let r_fav = r_copy.translate(vec2(-(bs + 6.0), 0.0));
+                        let r_pick = Rect::from_min_size(rect.min + vec2(8.0, 8.0), vec2(bs, bs));
+                        let mut hit = false;
+                        let id = ui.id();
+                        if hov || selecting {
+                            let rp = ui.interact(r_pick, id.with(("pick", i)), Sense::click());
+                            if rp.clicked() {
+                                acts.push(Act::Pick(path.clone()));
+                                hit = true;
+                            }
+                            if picked {
+                                p.circle_filled(r_pick.center(), 13.0, acc);
+                                icon_check(p, r_pick.center(), on_accent(acc));
+                            } else {
+                                p.circle_filled(r_pick.center(), 13.0, Color32::from_black_alpha(if rp.hovered() { 200 } else { 120 }));
+                                p.circle_stroke(r_pick.center(), 13.0, Stroke::new(1.5_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 190)));
+                            }
+                        }
+                        if hov {
+                            let rt = ui.interact(r_trash, id.with(("trash", i)), Sense::click()).on_hover_text(tr("Mettre à la corbeille"));
+                            let rc = ui.interact(r_copy, id.with(("copy", i)), Sense::click()).on_hover_text(tr("Copier l'image"));
+                            let rf = ui.interact(r_fav, id.with(("fav", i)), Sense::click()).on_hover_text(tr("Favori"));
+                            if rt.clicked() {
+                                acts.push(Act::Trash(vec![path.clone()]));
+                                hit = true;
+                            }
+                            if rc.clicked() {
+                                acts.push(Act::Copy(path.clone()));
+                                hit = true;
+                            }
+                            if rf.clicked() {
+                                acts.push(Act::Fav(path.clone()));
+                                hit = true;
+                            }
+                            p.circle_filled(r_trash.center(), bs / 2.0, if rt.hovered() { bg_h } else { bg_n });
+                            icon_trash(p, r_trash.center());
+                            p.circle_filled(r_copy.center(), bs / 2.0, if rc.hovered() { bg_h } else { bg_n });
+                            icon_copy(p, r_copy.center(), if rc.hovered() { bg_h } else { bg_n });
+                            p.circle_filled(r_fav.center(), bs / 2.0, if rf.hovered() { bg_h } else { bg_n });
+                            p.text(
+                                r_fav.center(),
+                                Align2::CENTER_CENTER,
+                                "★",
+                                FontId::proportional(16.0),
+                                if fav { Color32::GOLD } else { Color32::WHITE },
+                            );
+                        } else if fav {
+                            p.text(rect.right_top() + vec2(-10.0, 8.0), Align2::RIGHT_TOP, "★", FontId::proportional(20.0), Color32::GOLD);
+                        }
+
+                        resp.context_menu(|ui| {
+                            if ui.button(tr("Copier l'image")).clicked() {
+                                acts.push(Act::Copy(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(if fav { tr("Retirer des favoris") } else { tr("★ Ajouter aux favoris") }).clicked() {
+                                acts.push(Act::Fav(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Renommer…")).clicked() {
+                                acts.push(Act::Rename(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Annoter (éditeur intégré)")).clicked() {
+                                acts.push(Act::Annotate(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Épingler à l'écran")).clicked() {
+                                acts.push(Act::Pin(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Copier le fichier")).clicked() {
+                                acts.push(Act::CopyFile(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Modifier dans l'éditeur")).clicked() {
+                                acts.push(Act::Edit(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Copier le chemin")).clicked() {
+                                acts.push(Act::Path(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Afficher dans le dossier")).clicked() {
+                                acts.push(Act::Reveal(path.clone()));
+                                ui.close_menu();
+                            }
+                            if ui.button(tr("Mettre à la corbeille")).clicked() {
+                                acts.push(Act::Trash(vec![path.clone()]));
+                                ui.close_menu();
+                            }
+                        });
+                        if resp.clicked() && !hit {
+                            acts.push(if ctrl { Act::Pick(path.clone()) } else { Act::Open(i) });
+                        }
+                    }
+                });
+            }
+            ui.add_space(12.0);
+        });
+        if loads > 0 {
+            ctx.request_repaint();
+        }
+        for a in acts {
+            match a {
+                Act::Open(i) => {
+                    self.view = Some(i);
+                    self.zoom = None;
+                }
+                Act::Pick(p) => {
+                    if !self.sel.remove(&p) {
+                        self.sel.insert(p);
+                    }
+                }
+                Act::Fav(p) => self.toggle_fav(p),
+                Act::Copy(p) => {
+                    if let Ok(i) = image::open(&p) {
+                        copy_to_clipboard(&i.to_rgba8());
+                        self.status = tr("Image copiée dans le presse-papiers").into();
+                    }
+                }
+                Act::Reveal(p) => {
+                    let _ = Command::new("explorer").arg("/select,").arg(&p).spawn();
+                }
+                Act::Trash(v) => self.trash(v),
+                Act::Path(p) => {
+                    copy_text(&p.display().to_string());
+                    self.status = tr("Chemin copié").into();
+                }
+                Act::Edit(p) => self.edit(&p),
+                Act::Rename(p) => {
+                    let stem = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    self.rename_dlg = Some((p, stem));
+                }
+                Act::Pin(p) => {
+                    let s = p.display().to_string();
+                    let _ = spawn_self(&["--pin", s.as_str()]);
+                }
+                Act::Annotate(p) => self.editor = Editor::open(&ctx, &p),
+                Act::CopyFile(p) => {
+                    copy_files(&[p]);
+                    self.status = tr("Fichier copié : Ctrl+V dans l'Explorateur, un mail…").into();
+                }
+                Act::CopyFiles => {
+                    let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
+                    copy_files(&v);
+                    self.status = trf("{0} fichier(s) copié(s)", &[&v.len()]);
+                }
+                Act::Export => {
+                    if let Some(d) = rfd::FileDialog::new().pick_folder() {
+                        let mut n = 0;
+                        for p in &self.sel {
+                            if let Some(name) = p.file_name() {
+                                if std::fs::copy(p, d.join(name)).is_ok() {
+                                    n += 1;
+                                }
+                            }
+                        }
+                        self.status = trf("{0} fichier(s) exporté(s)", &[&n]);
+                    }
+                }
+                Act::Compare => {
+                    let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
+                    if v.len() == 2 {
+                        let load = |p: &PathBuf| image::open(p).ok().map(|i| tex(&ctx, "cmp", &i.to_rgba8()));
+                        if let (Some(a), Some(b)) = (load(&v[0]), load(&v[1])) {
+                            self.compare = Some(Cmp { a, b, na: file_name(&v[0]), nb: file_name(&v[1]), split: 0.5 });
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
