@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 308] = [
+pub static TABLE: [[&str; 5]; 310] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -193,7 +193,7 @@ pub static TABLE: [[&str; 5]; 308] = [
     ["Thème", "Theme", "Tema", "Design", "主题"],
     ["Choisis l'ambiance de l'interface : le changement est immédiat.", "Pick the look of the interface: the change is immediate.", "Elige el estilo de la interfaz: el cambio es inmediato.", "Wähle den Stil der Oberfläche: Die Änderung gilt sofort.", "选择界面风格：立即生效。"],
     ["Couleur d'accent", "Accent color", "Color de acento", "Akzentfarbe", "强调色"],
-    ["Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre.", "Main buttons, selection, bars and menu highlight. Pick a preset or any color.", "Botones principales, selección, barras y borde del menú. Elige un color rápido o uno libre.", "Hauptschaltflächen, Auswahl, Balken und Menümarkierung. Wähle eine Schnellfarbe oder eine eigene Farbe.", "主按钮、选中项、进度条和菜单高亮。可选预设颜色或自定义颜色。"],
+    ["Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre. « Auto » prend la couleur propre à chaque thème.", "Main buttons, selection, bars and menu highlight. Pick a preset or any color. “Auto” uses each theme's own color.", "Botones principales, selección, barras y borde del menú. Elige un color rápido o uno libre. «Auto» usa el color propio de cada tema.", "Hauptschaltflächen, Auswahl, Balken und Menümarkierung. Wähle eine Schnellfarbe oder eine eigene Farbe. „Auto“ nutzt die Farbe des jeweiligen Themas.", "主按钮、选中项、进度条和菜单高亮。可选预设颜色或自定义颜色。“自动”使用每个主题自己的颜色。"],
     ["Menu de l'icône du tray", "Tray icon menu", "Menú del icono de la bandeja", "Menü des Infobereich-Symbols", "托盘图标菜单"],
     ["Style du menu", "Menu style", "Estilo del menú", "Menüstil", "菜单样式"],
     ["Moderne : menu dessiné aux couleurs de l'appli (police Inter, coins arrondis), qui s'ouvre en une fraction de seconde. Système : menu natif de Windows, instantané.", "Modern: a menu drawn in the app's colors (Inter font, rounded corners) that opens in a split second. System: the native Windows menu, instant.", "Moderno: menú dibujado con los colores de la aplicación (fuente Inter, esquinas redondeadas), que se abre en una fracción de segundo. Sistema: menú nativo de Windows, instantáneo.", "Modern: ein Menü in den Farben der App (Schrift Inter, abgerundete Ecken), das sich in Sekundenbruchteilen öffnet. System: das native Windows-Menü, sofort da.", "现代：使用应用配色绘制的菜单（Inter 字体、圆角），瞬间打开。系统：Windows 原生菜单，即时显示。"],
@@ -311,4 +311,6 @@ pub static TABLE: [[&str; 5]; 308] = [
     ["Adapter à la fenêtre (0)", "Fit to window (0)", "Ajustar a la ventana (0)", "An Fenster anpassen (0)", "适应窗口（0）"],
     ["Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle", "Wheel: zoom · drag: move · double-click: fit / actual size", "Rueda: zoom · arrastrar: mover · doble clic: ajustar / tamaño real", "Mausrad: Zoom · Ziehen: verschieben · Doppelklick: einpassen / Originalgröße", "滚轮：缩放 · 拖动：移动 · 双击：适应 / 实际大小"],
     ["Molette : zoom · clic molette ou Espace + glisser : déplacer", "Wheel: zoom · middle-click or Space + drag: move", "Rueda: zoom · clic central o Espacio + arrastrar: mover", "Mausrad: Zoom · Mittelklick oder Leertaste + Ziehen: verschieben", "滚轮：缩放 · 中键或空格 + 拖动：移动"],
+    ["Auto|accent", "Auto", "Auto", "Auto", "自动"],
+    ["Couleur du thème : l'accent suit le thème choisi", "Theme color: the accent follows the chosen theme", "Color del tema: el acento sigue el tema elegido", "Themenfarbe: Der Akzent folgt dem gewählten Thema", "主题颜色：强调色随所选主题变化"],
 ];

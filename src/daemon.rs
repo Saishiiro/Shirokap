@@ -655,7 +655,7 @@ pub fn run() {
     for _ in 0..90 {
         let mut b = TrayIconBuilder::new()
             .with_menu_on_left_click(false)
-            .with_icon(icon(cfg.accent))
+            .with_icon(icon(cfg.accent_rgb()))
             .with_tooltip(tooltip(&cfg, &keys, false, false));
         if cfg.tray_menu == "native" {
             b = b.with_menu(Box::new(menu.clone())); // menu natif de Windows
@@ -794,7 +794,7 @@ pub fn run() {
                 Cmd::Pause => {
                     paused = !paused;
                     it.pause.set_checked(paused);
-                    let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent })));
+                    let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent_rgb() })));
                     let _ = tray.set_tooltip(Some(tooltip(&cfg, &keys, paused, auto_on)));
                 }
                 Cmd::Quit => {
@@ -855,7 +855,7 @@ pub fn run() {
         if let Some(t) = flash_until {
             if now >= t {
                 flash_until = None;
-                let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent })));
+                let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent_rgb() })));
             }
         }
         // nettoyage automatique des vieilles captures (si activé), toutes les 6 h
@@ -880,7 +880,7 @@ pub fn run() {
             }
             today = today_count(&cfg);
             sync(&it, &cfg, today);
-            let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent })));
+            let _ = tray.set_icon(Some(icon(if paused { GRAY } else { cfg.accent_rgb() })));
             let _ = tray.set_tooltip(Some(tooltip(&cfg, &keys, paused, auto_on)));
         }
     });

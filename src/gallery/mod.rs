@@ -153,7 +153,7 @@ impl App {
         Self {
             items: list_items(&cfg.save_dir),
             saved: toml::to_string(&cfg).unwrap_or_default(),
-            applied: (cfg.theme.clone(), cfg.accent),
+            applied: (cfg.theme.clone(), cfg.accent_rgb()),
             shown_pal: palette(&cfg.theme),
             shown_acc: accent(&cfg),
             theme_anim: None,
@@ -511,7 +511,7 @@ impl eframe::App for App {
         // On photographie d'abord l'écran avec l'ancien thème (la capture arrive à l'image suivante),
         // puis on applique le nouveau dessous et on dessine la photo par-dessus, percée d'un cercle qui grandit.
         // Changement de la seule couleur d'accent : fondu des couleurs.
-        let cur = (self.cfg.theme.clone(), self.cfg.accent);
+        let cur = (self.cfg.theme.clone(), self.cfg.accent_rgb());
         if cur != self.applied && self.reveal_req.is_none() {
             if cur.0 != self.applied.0 {
                 let origin = ctx.input(|i| i.pointer.interact_pos().or(i.pointer.hover_pos())).unwrap_or(ctx.screen_rect().center());
@@ -545,7 +545,7 @@ impl eframe::App for App {
                     // pas de capture possible (pilote graphique) : simple fondu
                     self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
                 }
-                self.applied = (self.cfg.theme.clone(), self.cfg.accent);
+                self.applied = (self.cfg.theme.clone(), self.cfg.accent_rgb());
                 self.reveal_req = None;
             }
             ctx.request_repaint();

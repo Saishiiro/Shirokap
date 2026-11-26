@@ -53,9 +53,45 @@ pub struct Config {
     pub sound: bool,
     pub flash: bool,
     pub theme: String,          // "dark" | "light"
-    pub accent: [u8; 3],
+    pub accent: [u8; 3],        // couleur d'accent fixe (utilisée quand accent_auto est faux)
+    #[serde(default)]           // ancienne config sans ce réglage : on garde la couleur fixe choisie
+    pub accent_auto: bool,      // vrai : l'accent suit le thème (couleur propre à chaque thème)
     pub tray_menu: String,      // "modern" (menu dessiné par l'appli) | "native" (menu Windows)
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
+}
+
+/// Couleur d'accent propre à chaque thème (mode « Auto »).
+pub fn theme_accent(theme: &str) -> [u8; 3] {
+    match theme {
+        "graphite" => [20, 184, 166],
+        "midnight" => [99, 132, 255],
+        "oled" => [34, 211, 238],
+        "ocean" => [45, 212, 191],
+        "forest" => [74, 222, 128],
+        "dusk" => [192, 132, 252],
+        "ruby" => [244, 63, 94],
+        "glacier" => [125, 196, 228],
+        "mocha" => [217, 160, 102],
+        "neon" => [217, 70, 239],
+        "light" => [37, 99, 235],
+        "sand" => [194, 120, 62],
+        "mint" => [16, 163, 127],
+        "lavender" => [124, 58, 237],
+        "sakura" => [219, 39, 119],
+        "sky" => [2, 132, 199],
+        _ => [59, 130, 246], // sombre
+    }
+}
+
+impl Config {
+    /// Couleur d'accent réellement affichée : celle du thème en mode « Auto », sinon la couleur fixe.
+    pub fn accent_rgb(&self) -> [u8; 3] {
+        if self.accent_auto {
+            theme_accent(&self.theme)
+        } else {
+            self.accent
+        }
+    }
 }
 
 impl Default for Config {
@@ -89,6 +125,7 @@ impl Default for Config {
             flash: true,
             theme: "dark".into(),
             accent: [59, 130, 246],
+            accent_auto: true,
             tray_menu: "modern".into(),
             language: "auto".into(),
         }

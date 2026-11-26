@@ -6,7 +6,8 @@ pub(crate) fn uv() -> Rect {
     Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0))
 }
 pub(crate) fn accent(c: &Config) -> Color32 {
-    Color32::from_rgb(c.accent[0], c.accent[1], c.accent[2])
+    let a = c.accent_rgb();
+    Color32::from_rgb(a[0], a[1], a[2])
 }
 
 pub(crate) fn col(r: u8, g: u8, b: u8) -> Color32 {

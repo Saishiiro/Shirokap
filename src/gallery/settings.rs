@@ -81,6 +81,7 @@ impl App {
             SetCat::Look => {
                 c.theme = d.theme;
                 c.accent = d.accent;
+                c.accent_auto = d.accent_auto;
                 c.tray_menu = d.tray_menu;
             }
             SetCat::Privacy => c.blocklist = d.blocklist,
@@ -248,38 +249,96 @@ impl App {
         // les cartes de thème puis les pastilles d'accent apparaissent en cascade à l'arrivée sur la page
         let since = self.tab_at.elapsed().min(self.cat_at.elapsed()).as_secs_f32();
         let appear = |n: usize| ease_out(((since - 0.1 - n as f32 * 0.035) / 0.45).clamp(0.0, 1.0));
-        if appear(THEMES.len() + ACCENTS.len()) < 1.0 {
+        if appear(THEMES.len() + ACCENTS.len() + 1) < 1.0 {
             ui.ctx().request_repaint();
         }
         card(ui, tr("Thème"), |ui| {
             setting(ui, tr("Thème"), tr("Choisis l'ambiance de l'interface : le changement est immédiat."), |ui| {
-                let acc = self.shown_acc;
+                let fixed = self.cfg.accent;
+                let auto = self.cfg.accent_auto;
                 ui.horizontal_wrapped(|ui| {
                     for (n, (key, name)) in THEMES.iter().enumerate() {
                         let pal = palette(key);
-                        if theme_card(ui, self.cfg.theme == *key, tr(name), &pal, acc, appear(n)).clicked() {
+                        // en mode « Auto », chaque vignette montre la couleur d'accent de son propre thème
+                        let a = if auto { theme_accent(key) } else { fixed };
+                        if theme_card(ui, self.cfg.theme == *key, tr(name), &pal, col(a[0], a[1], a[2]), appear(n)).clicked() {
                             self.cfg.theme = key.to_string();
                         }
                     }
                 });
             });
             divider(ui);
-            setting(ui, tr("Couleur d'accent"), tr("Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre."), |ui| {
+            setting(ui, tr("Couleur d'accent"), tr("Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre. « Auto » prend la couleur propre à chaque thème."), |ui| {
                 ui.horizontal(|ui| {
                     let ctx = ui.ctx().clone();
                     let now = ctx.input(|i| i.time);
                     let rip_id = egui::Id::new("accent_ripple");
                     let ripple = ctx.data(|d| d.get_temp::<(usize, f64)>(rip_id));
+                    // bouton « Auto » : la couleur suit le thème. Pastille aux couleurs du thème actuel + libellé,
+                    // dans une capsule pour le distinguer des couleurs fixes
+                    {
+                        let ta = theme_accent(&self.cfg.theme);
+                        let tcol = col(ta[0], ta[1], ta[2]);
+                        let (r, resp) = ui.allocate_exact_size(vec2(84.0, 28.0), Sense::click());
+                        let resp = resp.on_hover_text(tr("Couleur du thème : l'accent suit le thème choisi"));
+                        if resp.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+                        let on = self.cfg.accent_auto;
+                        let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::cubic_out);
+                        let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), on, 0.4, egui::emath::easing::back_out);
+                        let k = appear(THEMES.len());
+                        let mut p = ui.painter().clone();
+                        p.multiply_opacity(k);
+                        let r = r.translate(vec2(0.0, 10.0 * (1.0 - k))).expand(1.5 * hk);
+                        let v = ui.visuals();
+                        let txt = v.text_color();
+                        p.rect_filled(r, 14.0, v.widgets.inactive.bg_fill.lerp_to_gamma(v.widgets.hovered.bg_fill, hk));
+                        p.rect_stroke(r, 14.0, Stroke::new(1.0 + 1.0 * sk.clamp(0.0, 1.0), v.widgets.inactive.bg_stroke.color.lerp_to_gamma(tcol, sk.clamp(0.0, 1.0))));
+                        // pastille en dégradé circulaire de quelques couleurs de thèmes, centre = couleur du thème actuel
+                        let c = pos2(r.min.x + 15.0, r.center().y);
+                        let spin = if resp.hovered() { ctx.input(|i| i.time) as f32 * 1.2 } else { 0.0 }; // tourne au survol
+                        let segs = [theme_accent("ocean"), theme_accent("neon"), theme_accent("ruby"), theme_accent("mocha"), theme_accent("forest"), theme_accent("midnight")];
+                        for (j, sc) in segs.iter().enumerate() {
+                            let a0 = j as f32 / segs.len() as f32 * std::f32::consts::TAU;
+                            let a1 = (j + 1) as f32 / segs.len() as f32 * std::f32::consts::TAU;
+                            let pts: Vec<Pos2> = std::iter::once(c)
+                                .chain((0..=6).map(|t| {
+                                    let a = a0 + (a1 - a0) * t as f32 / 6.0 + spin;
+                                    c + vec2(a.cos(), a.sin()) * 9.0
+                                }))
+                                .collect();
+                            p.add(egui::Shape::convex_polygon(pts, col(sc[0], sc[1], sc[2]), Stroke::NONE));
+                        }
+                        p.circle_filled(c, 5.0, tcol);
+                        p.circle_stroke(c, 5.0, Stroke::new(1.5_f32, v.widgets.inactive.bg_fill));
+                        p.text(pos2(c.x + 14.0, r.center().y), Align2::LEFT_CENTER, tr("Auto|accent"), FontId::new(14.0, egui::FontFamily::Name("bold".into())), txt);
+                        if resp.hovered() {
+                            ctx.request_repaint();
+                        }
+                        if let Some((rn, t0)) = ripple {
+                            let e = ((now - t0) as f32 / 0.6).clamp(0.0, 1.0);
+                            if rn == usize::MAX && e < 1.0 {
+                                p.rect_stroke(r.expand(10.0 * ease_out(e)), 14.0 + 10.0 * e, Stroke::new(2.5 * (1.0 - e), tcol));
+                                ctx.request_repaint();
+                            }
+                        }
+                        if resp.clicked() {
+                            self.cfg.accent_auto = true;
+                            ctx.data_mut(|d| d.insert_temp(rip_id, (usize::MAX, now)));
+                        }
+                        ui.add_space(10.0);
+                    }
                     for (n, c) in ACCENTS.iter().enumerate() {
                         let (r, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
                         if resp.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
-                        let chosen = self.cfg.accent == *c;
+                        let chosen = !self.cfg.accent_auto && self.cfg.accent == *c;
                         // survol : la pastille grossit ; choix : l'anneau se referme autour en rebondissant
                         let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::back_out);
                         let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), chosen, 0.4, egui::emath::easing::back_out);
-                        let k = appear(THEMES.len() + n);
+                        let k = appear(THEMES.len() + 1 + n);
                         let ring = ui.visuals().text_color();
                         let color = col(c[0], c[1], c[2]);
                         let mut p = ui.painter().clone();
@@ -301,11 +360,18 @@ impl App {
                         }
                         if resp.clicked() {
                             self.cfg.accent = *c;
+                            self.cfg.accent_auto = false;
                             ctx.data_mut(|d| d.insert_temp(rip_id, (n, now)));
                         }
                     }
                     ui.add_space(8.0);
-                    color_button(ui, "accent", &mut self.cfg.accent);
+                    // couleur libre : elle montre la couleur affichée ; la modifier repasse en couleur fixe
+                    let mut free = self.cfg.accent_rgb();
+                    color_button(ui, "accent", &mut free);
+                    if free != self.cfg.accent_rgb() {
+                        self.cfg.accent = free;
+                        self.cfg.accent_auto = false;
+                    }
                 });
             });
         });
