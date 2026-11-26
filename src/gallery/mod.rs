@@ -81,9 +81,8 @@ struct App {
     shown_pal: Pal,      // palette affichée (mélange pendant un changement de thème)
     shown_acc: Color32,  // couleur d'accent affichée
     theme_anim: Option<(Pal, Color32, Instant)>, // départ d'un changement d'accent : couleurs d'origine + moment
-    hwnd: isize,         // fenêtre Windows de la galerie (pour Mica et la barre de titre)
-    glass: bool,         // effet Mica actif
-    look_key: Option<(bool, bool, [u8; 3])>, // (Mica voulu, thème sombre, fond) déjà appliqués à la fenêtre
+    hwnd: isize,         // fenêtre Windows de la galerie (pour la barre de titre)
+    look_key: Option<(bool, [u8; 3])>, // (thème sombre, fond) déjà appliqués à la barre de titre
     reveal_req: Option<(Pos2, Instant)>, // changement de thème : capture de l'ancien thème demandée (origine du cercle, moment)
     reveal: Option<(TextureHandle, Pos2, Instant)>, // ancien thème en image, qu'un cercle grandissant découvre
     applied_lang: String,
@@ -139,8 +138,6 @@ pub fn run(settings: bool) {
         let i = i.resize_exact(64, 64, image::imageops::FilterType::Lanczos3).to_rgba8();
         viewport = viewport.with_icon(egui::IconData { rgba: i.into_raw(), width: 64, height: 64 });
     }
-    // fenêtre transparente : permet l'effet Mica de Windows 11 (sinon les fonds restent opaques)
-    viewport = viewport.with_transparent(true);
     let opts = eframe::NativeOptions { viewport, ..Default::default() };
     let _ = eframe::run_native(
         "Shirokap",
@@ -176,7 +173,6 @@ impl App {
             theme_anim: None,
             reveal_req: None,
             hwnd,
-            glass: false,
             look_key: None,
             reveal: None,
             applied_lang: cfg.language.clone(),
@@ -343,14 +339,6 @@ impl eframe::App for App {
         self.save_state();
     }
 
-    /// Fond de la fenêtre transparent : ce sont les panneaux qui peignent le fond (opaque ou translucide).
-    fn clear_color(&self, visuals: &egui::Visuals) -> [f32; 4] {
-        if self.glass {
-            [0.0, 0.0, 0.0, 0.0]
-        } else {
-            visuals.panel_fill.to_normalized_gamma_f32()
-        }
-    }
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
         // F11 : plein écran depuis n'importe quel écran ; Échap en sort (hors visionneuse, qui gère son propre Échap)
@@ -569,7 +557,7 @@ impl eframe::App for App {
                     self.theme_anim = None;
                     self.shown_pal = palette(&self.cfg.theme);
                     self.shown_acc = accent(&self.cfg);
-                    apply_style_with(ctx, &self.shown_pal, self.shown_acc, self.glass);
+                    apply_style_with(ctx, &self.shown_pal, self.shown_acc);
                 } else {
                     // pas de capture possible (pilote graphique) : simple fondu
                     self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
@@ -583,23 +571,19 @@ impl eframe::App for App {
             let t = egui::emath::easing::cubic_in_out((t0.elapsed().as_secs_f32() / anim::THEME).min(1.0));
             self.shown_pal = lerp_pal(&from_pal, &palette(&self.cfg.theme), t);
             self.shown_acc = from_acc.lerp_to_gamma(accent(&self.cfg), t);
-            apply_style_with(ctx, &self.shown_pal, self.shown_acc, self.glass);
+            apply_style_with(ctx, &self.shown_pal, self.shown_acc);
             if t >= 1.0 {
                 self.theme_anim = None;
             } else {
                 ctx.request_repaint();
             }
         }
-        // matière de la fenêtre : Mica, barre de titre claire/sombre selon le thème
+        // barre de titre de Windows : claire ou sombre, et de la couleur du fond du thème (Windows 11)
         let target_pal = palette(&self.cfg.theme);
-        let key = (self.cfg.mica, target_pal.dark, [target_pal.bg.r(), target_pal.bg.g(), target_pal.bg.b()]);
+        let key = (target_pal.dark, [target_pal.bg.r(), target_pal.bg.g(), target_pal.bg.b()]);
         if self.look_key != Some(key) && self.reveal_req.is_none() {
             self.look_key = Some(key);
-            let glass = window_look(self.hwnd, self.cfg.mica, target_pal.dark, target_pal.bg);
-            if glass != self.glass {
-                self.glass = glass;
-                apply_style_with(ctx, &self.shown_pal, self.shown_acc, glass);
-            }
+            title_bar_look(self.hwnd, target_pal.dark, target_pal.bg);
         }
         let foc = ctx.input(|i| i.focused);
         if foc && !self.focused {
@@ -609,7 +593,7 @@ impl eframe::App for App {
 
         let immersive = self.fullscreen && self.view.is_some() && self.editor.is_none() && self.compare.is_none();
         if !immersive {
-        let side_fill = if self.glass { self.shown_pal.side.gamma_multiply(GLASS_SIDE) } else { self.shown_pal.side };
+        let side_fill = self.shown_pal.side;
         // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
         let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
         let nav_w = 56.0 + (190.0 - 56.0) * open_k;
@@ -838,39 +822,18 @@ pub(crate) fn ease_out(t: f32) -> f32 {
     1.0 - (1.0 - t).powi(3)
 }
 
-/// Applique la matière de la fenêtre (Windows 11) : Mica si demandé, barre de titre claire ou sombre,
-/// couleur de la barre de titre assortie au thème sans Mica. Renvoie vrai si Mica est réellement actif.
-fn window_look(hwnd: isize, mica: bool, dark: bool, bg: Color32) -> bool {
-    use windows_sys::Win32::Graphics::Dwm::{
-        DwmExtendFrameIntoClientArea, DwmSetWindowAttribute, DWMSBT_MAINWINDOW, DWMSBT_NONE, DWMWA_CAPTION_COLOR, DWMWA_COLOR_DEFAULT,
-        DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
-    };
-    use windows_sys::Win32::UI::Controls::MARGINS;
+/// Barre de titre assortie au thème : mode sombre ou clair, et couleur du fond du thème
+/// (la couleur n'est prise en compte que par Windows 11 ; Windows 10 garde sa barre habituelle).
+fn title_bar_look(hwnd: isize, dark: bool, bg: Color32) {
+    use windows_sys::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_CAPTION_COLOR, DWMWA_USE_IMMERSIVE_DARK_MODE};
     if hwnd == 0 {
-        return false;
+        return;
     }
     let h = hwnd as windows_sys::Win32::Foundation::HWND;
-    let set = |attr: i32, val: *const std::ffi::c_void, size: usize| unsafe { DwmSetWindowAttribute(h, attr as u32, val, size as u32) >= 0 };
     let dark_flag: i32 = dark as i32;
-    set(DWMWA_USE_IMMERSIVE_DARK_MODE, &dark_flag as *const i32 as _, 4);
-    let mut ok = false;
-    if mica {
-        let kind = DWMSBT_MAINWINDOW;
-        ok = set(DWMWA_SYSTEMBACKDROP_TYPE, &kind as *const i32 as _, 4); // échoue sous Windows 10 : on reste opaque
+    let c: u32 = bg.r() as u32 | (bg.g() as u32) << 8 | (bg.b() as u32) << 16; // COLORREF : 0x00BBGGRR
+    unsafe {
+        DwmSetWindowAttribute(h, DWMWA_USE_IMMERSIVE_DARK_MODE as u32, &dark_flag as *const i32 as _, 4);
+        DwmSetWindowAttribute(h, DWMWA_CAPTION_COLOR as u32, &c as *const u32 as _, 4);
     }
-    if ok {
-        let m = MARGINS { cxLeftWidth: -1, cxRightWidth: -1, cyTopHeight: -1, cyBottomHeight: -1 };
-        unsafe { DwmExtendFrameIntoClientArea(h, &m) };
-        let def = DWMWA_COLOR_DEFAULT;
-        set(DWMWA_CAPTION_COLOR, &def as *const u32 as _, 4);
-    } else {
-        let none = DWMSBT_NONE;
-        set(DWMWA_SYSTEMBACKDROP_TYPE, &none as *const i32 as _, 4);
-        let m = MARGINS::default();
-        unsafe { DwmExtendFrameIntoClientArea(h, &m) };
-        // barre de titre de la couleur du fond du thème (COLORREF : 0x00BBGGRR ; ignoré sous Windows 10)
-        let c: u32 = bg.r() as u32 | (bg.g() as u32) << 8 | (bg.b() as u32) << 16;
-        set(DWMWA_CAPTION_COLOR, &c as *const u32 as _, 4);
-    }
-    ok
 }

@@ -56,7 +56,6 @@ pub struct Config {
     pub accent: [u8; 3],        // couleur d'accent fixe (utilisée quand accent_auto est faux)
     #[serde(default)]           // ancienne config sans ce réglage : on garde la couleur fixe choisie
     pub accent_auto: bool,      // vrai : l'accent suit le thème (couleur propre à chaque thème)
-    pub mica: bool,             // effet Mica de Windows 11 (fond translucide) dans la galerie
     pub tray_menu: String,      // "modern" (menu dessiné par l'appli) | "native" (menu Windows)
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
 }
@@ -127,7 +126,6 @@ impl Default for Config {
             theme: "dark".into(),
             accent: [59, 130, 246],
             accent_auto: true,
-            mica: true,
             tray_menu: "modern".into(),
             language: "auto".into(),
         }

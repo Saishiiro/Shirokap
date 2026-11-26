@@ -35,11 +35,11 @@ pub(crate) fn install_fonts_with(ctx: &egui::Context, cjk: bool) {
         "Inter-SemiBold".to_owned(),
         egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-SemiBold.ttf")).into(),
     );
-    // icônes Lucide : des caractères spéciaux qu'on peut mêler au texte ; décalées pour s'aligner sur les lettres
+    // icônes Lucide : des caractères spéciaux qu'on peut mêler au texte (egui les centre déjà sur la ligne)
     fonts.font_data.insert(
         "Icons".to_owned(),
         egui::FontData::from_static(include_bytes!("../../assets/fonts/Lucide-subset.ttf"))
-            .tweak(egui::FontTweak { scale: 1.0, y_offset_factor: 0.16, y_offset: 0.0, baseline_offset_factor: 0.0 })
+            .tweak(egui::FontTweak { scale: 1.0, y_offset_factor: 0.0, y_offset: 0.0, baseline_offset_factor: 0.0 })
             .into(),
     );
     let prop = fonts.families.entry(egui::FontFamily::Proportional).or_default();
@@ -211,13 +211,9 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
     resp
 }
 
-/// Opacité des fonds avec l'effet Mica (fond de la fenêtre, menu latéral).
-pub(crate) const GLASS_BG: f32 = 0.8;
-pub(crate) const GLASS_SIDE: f32 = 0.66;
-
 /// Thème sobre : gris neutres + une seule couleur d'accent.
 pub(crate) fn apply_style(ctx: &egui::Context, cfg: &Config) {
-    apply_style_with(ctx, &palette(&cfg.theme), accent(cfg), false);
+    apply_style_with(ctx, &palette(&cfg.theme), accent(cfg));
 }
 
 /// Mélange de deux palettes (t = 0 : `a`, t = 1 : `b`), pour passer d'un thème à l'autre en douceur.
@@ -238,11 +234,9 @@ pub(crate) fn lerp_pal(a: &Pal, b: &Pal, t: f32) -> Pal {
     }
 }
 
-/// `glass` : effet Mica actif, les fonds deviennent un peu translucides pour laisser voir la matière de Windows.
-pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32, glass: bool) {
+pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     let pal = *pal;
     let (bg, card, input, hover, button, line, text) = (pal.bg, pal.card, pal.input, pal.hover, pal.button, pal.line, pal.text);
-    let (bg, card) = if glass { (bg.gamma_multiply(GLASS_BG), card.gamma_multiply(0.9)) } else { (bg, card) };
     let mut v = if pal.dark { egui::Visuals::dark() } else { egui::Visuals::light() };
     v.override_text_color = Some(text);
     v.panel_fill = bg;

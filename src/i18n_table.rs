@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 313] = [
+pub static TABLE: [[&str; 5]; 310] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -313,7 +313,4 @@ pub static TABLE: [[&str; 5]; 313] = [
     ["Molette : zoom · clic molette ou Espace + glisser : déplacer", "Wheel: zoom · middle-click or Space + drag: move", "Rueda: zoom · clic central o Espacio + arrastrar: mover", "Mausrad: Zoom · Mittelklick oder Leertaste + Ziehen: verschieben", "滚轮：缩放 · 中键或空格 + 拖动：移动"],
     ["Auto|accent", "Auto", "Auto", "Auto", "自动"],
     ["Couleur du thème : l'accent suit le thème choisi", "Theme color: the accent follows the chosen theme", "Color del tema: el acento sigue el tema elegido", "Themenfarbe: Der Akzent folgt dem gewählten Thema", "主题颜色：强调色随所选主题变化"],
-    ["Matière", "Material", "Material", "Material", "材质"],
-    ["Effet Mica (Windows 11)", "Mica effect (Windows 11)", "Efecto Mica (Windows 11)", "Mica-Effekt (Windows 11)", "Mica 效果（Windows 11）"],
-    ["Fond légèrement translucide qui laisse deviner ton fond d'écran, comme les applis récentes de Windows 11. Sans effet sous Windows 10.", "Slightly translucent background that lets your wallpaper show through, like recent Windows 11 apps. No effect on Windows 10.", "Fondo ligeramente translúcido que deja entrever tu fondo de pantalla, como las aplicaciones recientes de Windows 11. Sin efecto en Windows 10.", "Leicht durchscheinender Hintergrund, durch den dein Hintergrundbild schimmert, wie bei neueren Windows-11-Apps. Unter Windows 10 ohne Wirkung.", "略微透明的背景，可隐约看到桌面壁纸，就像 Windows 11 的新应用。在 Windows 10 上无效。"],
 ];
