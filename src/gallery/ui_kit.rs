@@ -278,6 +278,9 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     ctx.set_visuals(v);
     ctx.style_mut(|s| {
         s.animation_time = 0.2; // transitions intégrées d'egui (sections repliables, défilement…)
+        // barre de défilement aux couleurs du thème (au lieu du blanc) : teinte des boutons au repos,
+        // plus claire au survol, couleur d'accent quand on la fait glisser
+        s.spacing.scroll.foreground_color = false;
         s.spacing.item_spacing = vec2(10.0, 10.0);
         s.spacing.button_padding = vec2(14.0, 7.0);
         s.spacing.interact_size.y = 30.0;
