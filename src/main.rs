@@ -14,6 +14,7 @@ mod daemon;
 mod editor;
 mod gallery;
 mod i18n;
+mod icons;
 mod i18n_table;
 mod picker;
 mod pin;

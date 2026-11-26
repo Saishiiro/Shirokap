@@ -155,6 +155,7 @@ See `CHANGELOG.md`.
 
 - Shirokap is free software released under the **GNU General Public License v3.0** (`LICENSE`), © 2026 Saishiiro. You can use, share and modify it freely; any redistributed version, modified or not, must stay under the same license and come with its source code.
 - **Inter** font © Rasmus Andersson, SIL Open Font License 1.1 (`assets/fonts/LICENSE-Inter.txt`).
+- **Lucide** icons © Lucide Icons and Contributors, ISC license (part derived from Feather, MIT) (`assets/fonts/LICENSE-Lucide.txt`).
 - The Rust libraries used (egui, xcap, tray-icon, global-hotkey, image, etc.) have their own licenses, mostly MIT and Apache-2.0.
 
 ---
@@ -303,5 +304,6 @@ Voir `CHANGELOG.md`.
 
 - Shirokap est un logiciel libre publié sous licence **GNU General Public License v3.0** (`LICENSE`), © 2026 Saishiiro. Tu peux l'utiliser, le partager et le modifier librement ; toute version redistribuée, modifiée ou non, doit rester sous la même licence et être fournie avec son code source.
 - Police **Inter** © Rasmus Andersson, licence SIL Open Font License 1.1 (`assets/fonts/LICENSE-Inter.txt`).
+- Icônes **Lucide** © Lucide Icons and Contributors, licence ISC (en partie issues de Feather, MIT) (`assets/fonts/LICENSE-Lucide.txt`).
 - Les bibliothèques Rust utilisées (egui, xcap, tray-icon, global-hotkey, image, etc.) ont leurs propres licences,
   principalement MIT et Apache-2.0.

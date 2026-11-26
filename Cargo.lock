@@ -3183,6 +3183,7 @@ dependencies = [
  "eframe",
  "global-hotkey",
  "image",
+ "raw-window-handle",
  "rfd",
  "serde",
  "tao",

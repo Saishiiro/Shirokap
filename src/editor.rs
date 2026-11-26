@@ -1,5 +1,6 @@
 use crate::common::*;
 use crate::i18n::*;
+use crate::icons;
 use crate::picker::{color_button, on_accent};
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
 use eframe::egui::{self, pos2, vec2, Align2, Color32, FontId, Key, Pos2, Rect, Sense, Stroke};
@@ -592,14 +593,15 @@ impl Editor {
         let mut undo = false;
         let mut redo = false;
         ui.horizontal_wrapped(|ui| {
-            if ui.button(tr("← Fermer")).clicked() {
+            let ic = |i: &str, t: &str| format!("{i}  {t}");
+            if ui.button(ic(icons::BACK, tr("← Fermer").trim_start_matches("← "))).clicked() {
                 exit = Exit::Close;
             }
             ui.separator();
-            ui.selectable_value(&mut self.tool, Tool::Pen, tr("Stylo"));
+            ui.selectable_value(&mut self.tool, Tool::Pen, ic(icons::PEN, tr("Stylo")));
             let cur_shape = SHAPES.iter().find(|s| s.0 == self.shape).map(|s| tr(s.1)).unwrap_or(tr("Rectangle"));
             let shapes_label =
-                if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() };
+                ic(icons::SHAPES, &if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() });
             dropdown(ui, &shapes_label, self.tool == Tool::Shape, |ui| {
                 for (k, name) in SHAPES {
                     if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
@@ -609,14 +611,14 @@ impl Editor {
                     }
                 }
             });
-            for (t, n) in [
-                (Tool::Highlight, tr("Surligneur")),
-                (Tool::Blur, tr("Flou")),
-                (Tool::Text, tr("Texte")),
-                (Tool::Step, tr("Étape n°")),
-                (Tool::Eraser, tr("Gomme")),
+            for (t, i, n) in [
+                (Tool::Highlight, icons::HIGHLIGHT, tr("Surligneur")),
+                (Tool::Blur, icons::BLUR, tr("Flou")),
+                (Tool::Text, icons::TEXT, tr("Texte")),
+                (Tool::Step, icons::STEP, tr("Étape n°")),
+                (Tool::Eraser, icons::ERASER, tr("Gomme")),
             ] {
-                ui.selectable_value(&mut self.tool, t, n);
+                ui.selectable_value(&mut self.tool, t, ic(i, n));
             }
             ui.separator();
             if !matches!(self.tool, Tool::Eraser | Tool::Blur) {
@@ -624,10 +626,10 @@ impl Editor {
             }
             match self.tool {
                 Tool::Text | Tool::Step => {
-                    ui.add(egui::Slider::new(&mut self.tsize, 12.0..=160.0).text("taille"));
+                    ui.add(egui::Slider::new(&mut self.tsize, 12.0..=160.0).text(tr("Taille")));
                 }
                 Tool::Eraser => {
-                    ui.add(egui::Slider::new(&mut self.ew, 4.0..=120.0).text("gomme"));
+                    ui.add(egui::Slider::new(&mut self.ew, 4.0..=120.0).text(tr("Taille")));
                 }
                 Tool::Highlight | Tool::Blur => {}
                 _ => {
@@ -635,22 +637,22 @@ impl Editor {
                 }
             }
             ui.separator();
-            if ui.add_enabled(!self.ops.is_empty(), egui::Button::new(tr("Annuler|modif"))).on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
+            if ui.add_enabled(!self.ops.is_empty(), egui::Button::new(ic(icons::UNDO, tr("Annuler|modif")))).on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
                 undo = true;
             }
-            if ui.add_enabled(!self.redo.is_empty(), egui::Button::new(tr("Rétablir"))).on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
+            if ui.add_enabled(!self.redo.is_empty(), egui::Button::new(ic(icons::REDO, tr("Rétablir")))).on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
                 redo = true;
             }
-            if ui.button(tr("Copier")).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
+            if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
                 copy_to_clipboard(&self.render());
                 self.status = tr("Copiée dans le presse-papiers").into();
             }
             let acc = ui.visuals().selection.bg_fill;
-            let save_btn = egui::Button::new(egui::RichText::new(tr("Enregistrer")).color(on_accent(acc))).fill(acc);
+            let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc))).fill(acc);
             if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
                 save = Some(false);
             }
-            dropdown(ui, tr("Plus…"), false, |ui| {
+            dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
                 if ui.button(tr("Remplacer l'original")).clicked() {
                     self.confirm = true;
                     ui.close_menu();

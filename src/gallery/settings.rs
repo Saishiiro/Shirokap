@@ -11,15 +11,15 @@ impl App {
             .resizable(false)
             .frame(egui::Frame::none())
             .show_inside(ui, |ui| {
-                for (c, n) in [
-                    (SetCat::Shortcuts, tr("Raccourcis")),
-                    (SetCat::Capture, tr("Capture")),
-                    (SetCat::Files, tr("Fichiers")),
-                    (SetCat::Look, tr("Apparence")),
-                    (SetCat::Privacy, tr("Confidentialité")),
-                    (SetCat::System, tr("Système")),
+                for (c, i, n) in [
+                    (SetCat::Shortcuts, icons::KEYBOARD, tr("Raccourcis")),
+                    (SetCat::Capture, icons::CAMERA, tr("Capture")),
+                    (SetCat::Files, icons::FOLDER, tr("Fichiers")),
+                    (SetCat::Look, icons::PALETTE, tr("Apparence")),
+                    (SetCat::Privacy, icons::SHIELD, tr("Confidentialité")),
+                    (SetCat::System, icons::SYSTEM, tr("Système")),
                 ] {
-                    nav_item(ui, &mut self.set_cat, c, n);
+                    nav_item(ui, &mut self.set_cat, c, i, n);
                 }
             });
         // changement de rubrique : le contenu arrive en fondu depuis la droite
@@ -82,6 +82,7 @@ impl App {
                 c.theme = d.theme;
                 c.accent = d.accent;
                 c.accent_auto = d.accent_auto;
+                c.mica = d.mica;
                 c.tray_menu = d.tray_menu;
             }
             SetCat::Privacy => c.blocklist = d.blocklist,
@@ -93,7 +94,7 @@ impl App {
     pub(super) fn reset_row(&mut self, ui: &mut egui::Ui, cat: SetCat) {
         ui.add_space(2.0);
         if ui
-            .button(tr("Rétablir les valeurs par défaut de cette rubrique"))
+            .button(ic(icons::RESET, tr("Rétablir les valeurs par défaut de cette rubrique")))
             .on_hover_text(tr("Remet uniquement les réglages de cette page à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer »."))
             .clicked()
         {
@@ -374,6 +375,16 @@ impl App {
                     }
                 });
             });
+        });
+        card(ui, &ic(icons::SPARKLES, tr("Matière")), |ui| {
+            setting(
+                ui,
+                tr("Effet Mica (Windows 11)"),
+                tr("Fond légèrement translucide qui laisse deviner ton fond d'écran, comme les applis récentes de Windows 11. Sans effet sous Windows 10."),
+                |ui| {
+                    ui.checkbox(&mut self.cfg.mica, tr("Activé"));
+                },
+            );
         });
         card(ui, tr("Menu de l'icône du tray"), |ui| {
             setting(

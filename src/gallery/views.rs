@@ -32,7 +32,7 @@ impl App {
         ui.label(bold_text(tr("Statistiques"), 24.0));
         ui.add_space(4.0);
         egui::ScrollArea::vertical().show(ui, |ui| {
-            card(ui, tr("Vue d'ensemble"), |ui| {
+            card(ui, &ic(icons::LAYERS, tr("Vue d'ensemble")), |ui| {
                 ui.label(format!("{} · {}", n_captures(self.items.len()), human(total)));
                 ui.label(n_favs(self.favs.len()));
                 if let Some(o) = self.items.last() {
@@ -42,7 +42,7 @@ impl App {
                     ui.label(trf("Plus lourde : {0} ({1})", &[&file_name(&b.path), &human(b.size)]));
                 }
             });
-            card(ui, tr("7 derniers jours"), |ui| {
+            card(ui, &ic(icons::CALENDAR, tr("7 derniers jours")), |ui| {
                 let counts: Vec<(String, usize)> = (0..7)
                     .map(|d| {
                         let day = today - chrono::Duration::days(d);
@@ -73,7 +73,7 @@ impl App {
                     p.text(pos2(bar.max.x + 12.0, row.center().y), Align2::LEFT_CENTER, shown_n.to_string(), FontId::proportional(15.0), txt);
                 }
             });
-            card(ui, tr("Dossiers / jeux"), |ui| {
+            card(ui, &ic(icons::FOLDER, tr("Dossiers / jeux")), |ui| {
                 let mut by: HashMap<String, (usize, u64)> = HashMap::new();
                 for i in &self.items {
                     let name = if i.folder.is_empty() { "(racine)".to_string() } else { i.folder.clone() };
@@ -93,7 +93,7 @@ impl App {
     pub(super) fn compare_ui(&mut self, ui: &mut egui::Ui) {
         let mut close = ui.input(|i| i.key_pressed(Key::Escape));
         ui.horizontal(|ui| {
-            if ui.button(tr("← Retour")).clicked() {
+            if ui.button(ic(icons::BACK, tr("← Retour").trim_start_matches("← "))).clicked() {
                 close = true;
             }
             if let Some(c) = &self.compare {
@@ -142,23 +142,23 @@ impl App {
         let danger = col(239, 68, 68);
         if !self.fullscreen {
         ui.horizontal_wrapped(|ui| {
-            if ui.button(tr("← Retour")).clicked() {
+            if ui.button(ic(icons::BACK, tr("← Retour").trim_start_matches("← "))).clicked() {
                 self.view = None;
             }
-            if ui.add(egui::Button::new("‹").min_size(vec2(34.0, 30.0))).on_hover_text(tr("Précédente (←)")).clicked() {
+            if ui.add(egui::Button::new(icons::PREV).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Précédente (←)")).clicked() {
                 step = -1;
             }
-            if ui.add(egui::Button::new("›").min_size(vec2(34.0, 30.0))).on_hover_text(tr("Suivante (→)")).clicked() {
+            if ui.add(egui::Button::new(icons::NEXT).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Suivante (→)")).clicked() {
                 step = 1;
             }
             ui.separator();
-            if ui.button(tr("Copier")).on_hover_text(tr("Copier l'image dans le presse-papiers")).clicked() {
+            if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image dans le presse-papiers")).clicked() {
                 if let Ok(i) = image::open(&path) {
                     copy_to_clipboard(&i.to_rgba8());
                     self.status = tr("Image copiée dans le presse-papiers").into();
                 }
             }
-            let annot = egui::Button::new(egui::RichText::new(tr("Annoter")).color(on_accent(acc))).fill(acc);
+            let annot = egui::Button::new(egui::RichText::new(ic(icons::ANNOTATE, tr("Annoter"))).color(on_accent(acc))).fill(acc);
             if ui.add(annot).on_hover_text(tr("Ouvrir l'éditeur d'annotations")).clicked() {
                 annotate = true;
             }
@@ -170,42 +170,43 @@ impl App {
             if ui.add(egui::Button::new(star)).on_hover_text(tr("Favori (F)")).clicked() {
                 tfav = true;
             }
-            let trash = egui::Button::new(egui::RichText::new(tr("Corbeille")).color(danger));
+            let trash = egui::Button::new(egui::RichText::new(ic(icons::TRASH, tr("Corbeille"))).color(danger));
             if ui.add(trash).on_hover_text(tr("Mettre à la corbeille (Suppr)")).clicked() {
                 del = true;
             }
-            dropdown(ui, tr("Plus…"), false, |ui| {
-                if ui.button(tr("Renommer")).clicked() {
+            dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
+                if ui.button(ic(icons::RENAME, tr("Renommer"))).clicked() {
                     ren = true;
                     ui.close_menu();
                 }
-                if ui.button(tr("Épingler à l'écran")).clicked() {
+                if ui.button(ic(icons::PIN, tr("Épingler à l'écran"))).clicked() {
                     pin = true;
                     ui.close_menu();
                 }
-                if ui.button(tr("Modifier dans l'éditeur externe")).clicked() {
+                if ui.button(ic(icons::EDIT_EXT, tr("Modifier dans l'éditeur externe"))).clicked() {
                     edit = true;
                     ui.close_menu();
                 }
                 ui.separator();
-                if ui.button(tr("Ouvrir avec l'application par défaut")).clicked() {
+                if ui.button(ic(icons::EXTERNAL, tr("Ouvrir avec l'application par défaut"))).clicked() {
                     let _ = Command::new("explorer").arg(&path).spawn();
                     ui.close_menu();
                 }
-                if ui.button(tr("Afficher dans le dossier")).clicked() {
+                if ui.button(ic(icons::FOLDER_OPEN, tr("Afficher dans le dossier"))).clicked() {
                     let _ = Command::new("explorer").arg("/select,").arg(&path).spawn();
                     ui.close_menu();
                 }
-                if ui.button(tr("Copier le fichier")).clicked() {
+                if ui.button(ic(icons::FOLDER, tr("Copier le fichier"))).clicked() {
                     cfile = true;
                     ui.close_menu();
                 }
-                if ui.button(tr("Copier le chemin")).clicked() {
+                if ui.button(ic(icons::LINK, tr("Copier le chemin"))).clicked() {
                     cpath = true;
                     ui.close_menu();
                 }
                 ui.separator();
-                let ss = egui::Button::new(if self.slideshow { tr("Arrêter le diaporama") } else { tr("Diaporama") }).shortcut_text(tr("Espace"));
+                let ss = egui::Button::new(if self.slideshow { ic(icons::PAUSE, tr("Arrêter le diaporama")) } else { ic(icons::PLAY, tr("Diaporama")) })
+                    .shortcut_text(tr("Espace"));
                 if ui.add(ss).clicked() {
                     self.slideshow = !self.slideshow;
                     self.slide_at = Instant::now();
@@ -221,7 +222,7 @@ impl App {
                 if ui.radio(self.slide_new_first, tr("Du plus récent au plus ancien")).clicked() {
                     self.slide_new_first = true;
                 }
-                if ui.add(egui::Button::new(tr("Plein écran")).shortcut_text("F11")).clicked() {
+                if ui.add(egui::Button::new(ic(icons::FULLSCREEN, tr("Plein écran"))).shortcut_text("F11")).clicked() {
                     self.fullscreen = !self.fullscreen;
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
                     ui.close_menu();

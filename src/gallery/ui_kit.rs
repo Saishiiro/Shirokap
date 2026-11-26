@@ -35,8 +35,16 @@ pub(crate) fn install_fonts_with(ctx: &egui::Context, cjk: bool) {
         "Inter-SemiBold".to_owned(),
         egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-SemiBold.ttf")).into(),
     );
+    // icônes Lucide : des caractères spéciaux qu'on peut mêler au texte ; décalées pour s'aligner sur les lettres
+    fonts.font_data.insert(
+        "Icons".to_owned(),
+        egui::FontData::from_static(include_bytes!("../../assets/fonts/Lucide-subset.ttf"))
+            .tweak(egui::FontTweak { scale: 1.0, y_offset_factor: 0.16, y_offset: 0.0, baseline_offset_factor: 0.0 })
+            .into(),
+    );
     let prop = fonts.families.entry(egui::FontFamily::Proportional).or_default();
     prop.insert(0, "Inter".to_owned());
+    prop.insert(1, "Icons".to_owned());
     if cjk {
         if let Some(b) = cjk_font() {
             fonts.font_data.insert("CJK".to_owned(), egui::FontData::from_static(b));
@@ -203,9 +211,13 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
     resp
 }
 
+/// Opacité des fonds avec l'effet Mica (fond de la fenêtre, menu latéral).
+pub(crate) const GLASS_BG: f32 = 0.8;
+pub(crate) const GLASS_SIDE: f32 = 0.66;
+
 /// Thème sobre : gris neutres + une seule couleur d'accent.
 pub(crate) fn apply_style(ctx: &egui::Context, cfg: &Config) {
-    apply_style_with(ctx, &palette(&cfg.theme), accent(cfg));
+    apply_style_with(ctx, &palette(&cfg.theme), accent(cfg), false);
 }
 
 /// Mélange de deux palettes (t = 0 : `a`, t = 1 : `b`), pour passer d'un thème à l'autre en douceur.
@@ -226,9 +238,11 @@ pub(crate) fn lerp_pal(a: &Pal, b: &Pal, t: f32) -> Pal {
     }
 }
 
-pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
+/// `glass` : effet Mica actif, les fonds deviennent un peu translucides pour laisser voir la matière de Windows.
+pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32, glass: bool) {
     let pal = *pal;
     let (bg, card, input, hover, button, line, text) = (pal.bg, pal.card, pal.input, pal.hover, pal.button, pal.line, pal.text);
+    let (bg, card) = if glass { (bg.gamma_multiply(GLASS_BG), card.gamma_multiply(0.9)) } else { (bg, card) };
     let mut v = if pal.dark { egui::Visuals::dark() } else { egui::Visuals::light() };
     v.override_text_color = Some(text);
     v.panel_fill = bg;
@@ -236,7 +250,11 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     v.extreme_bg_color = input;
     v.faint_bg_color = card;
     v.window_stroke = Stroke::new(1.0_f32, line);
-    v.window_rounding = Rounding::same(12.0);
+    v.window_rounding = Rounding::same(14.0);
+    // ombres douces sous les fenêtres et menus déroulants
+    let sh = if pal.dark { 110 } else { 40 };
+    v.window_shadow = egui::epaint::Shadow { offset: vec2(0.0, 10.0), blur: 32.0, spread: 0.0, color: Color32::from_black_alpha(sh) };
+    v.popup_shadow = egui::epaint::Shadow { offset: vec2(0.0, 6.0), blur: 20.0, spread: 0.0, color: Color32::from_black_alpha(sh * 3 / 4) };
     v.menu_rounding = Rounding::same(8.0);
     v.selection.bg_fill = acc;
     v.selection.stroke = Stroke::new(1.0_f32, on_accent(acc));
@@ -277,30 +295,40 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     });
 }
 
-pub(crate) fn icon_copy(p: &egui::Painter, c: Pos2, bg: Color32) {
-    let st = Stroke::new(1.6_f32, Color32::WHITE);
-    p.rect_stroke(Rect::from_center_size(c + vec2(2.5, -2.5), vec2(9.0, 10.0)), 2.0, st);
-    let front = Rect::from_center_size(c + vec2(-2.0, 2.0), vec2(9.0, 10.0));
-    p.rect_filled(front, 2.0, bg);
-    p.rect_stroke(front, 2.0, st);
-}
-
-pub(crate) fn icon_trash(p: &egui::Painter, c: Pos2) {
-    let st = Stroke::new(1.6_f32, Color32::WHITE);
-    p.line_segment([c + vec2(-6.0, -4.5), c + vec2(6.0, -4.5)], st);
-    p.line_segment([c + vec2(-2.0, -4.5), c + vec2(-2.0, -7.0)], st);
-    p.line_segment([c + vec2(2.0, -4.5), c + vec2(2.0, -7.0)], st);
-    p.line_segment([c + vec2(-2.0, -7.0), c + vec2(2.0, -7.0)], st);
-    p.rect_stroke(Rect::from_center_size(c + vec2(0.0, 2.5), vec2(9.0, 10.0)), 1.5, st);
-}
-
 pub(crate) fn icon_check(p: &egui::Painter, c: Pos2, color: Color32) {
     let st = Stroke::new(2.0_f32, color);
     p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
     p.line_segment([c + vec2(-1.5, 3.5), c + vec2(4.5, -3.0)], st);
 }
 
-/// Petit bouton « panneau latéral » (rectangle avec un trait à gauche), pour ouvrir / réduire le menu.
+/// Texte précédé d'une icône.
+pub(crate) fn ic(icon: &str, label: &str) -> String {
+    format!("{icon}  {label}")
+}
+
+/// Bouton carré avec une seule icône (barre latérale réduite, barres d'outils). `on` : état actif (teinté).
+pub(crate) fn icon_button(ui: &mut egui::Ui, icon: &str, on: bool) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(34.0, 34.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("on"), on, super::anim::PAGE, egui::emath::easing::cubic_out);
+    let v = ui.visuals();
+    let acc = v.selection.bg_fill;
+    let p = ui.painter();
+    if hk * (1.0 - sk) > 0.01 {
+        p.rect_filled(rect, 9.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
+    }
+    if sk > 0.01 {
+        p.rect_filled(rect, 9.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), (55.0 * sk) as u8));
+    }
+    let col = v.text_color().lerp_to_gamma(acc, 0.35 * sk);
+    p.text(rect.center(), Align2::CENTER_CENTER, icon, FontId::proportional(18.0), col);
+    resp
+}
+
+/// Petit bouton « panneau latéral », pour ouvrir / réduire le menu.
 pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::click());
     if resp.hovered() {
@@ -313,15 +341,12 @@ pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
     if hk > 0.01 {
         p.rect_filled(rect, 8.0, hover.gamma_multiply(hk));
     }
-    let c = rect.center();
-    let st = Stroke::new(1.6_f32, color);
-    p.rect_stroke(Rect::from_center_size(c, vec2(17.0, 14.0)), 3.5, st);
-    p.line_segment([c + vec2(-3.0, -7.0), c + vec2(-3.0, 7.0)], st);
+    p.text(rect.center(), Align2::CENTER_CENTER, crate::icons::SIDEBAR, FontId::proportional(18.0), color);
     resp
 }
 
 /// Entrée de la barre latérale : fond teinté + liseré d'accent quand elle est active.
-pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab: T, label: &str) {
+pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab: T, icon: &str, label: &str) {
     let selected = *cur == tab;
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
     if resp.hovered() {
@@ -348,7 +373,9 @@ pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab:
     } else {
         FontId::proportional(15.0)
     };
-    p.text(rect.left_center() + vec2(16.0 + 4.0 * sk, 0.0), Align2::LEFT_CENTER, label, font, txt);
+    let x = 14.0 + 3.0 * sk;
+    p.text(rect.left_center() + vec2(x, 0.0), Align2::LEFT_CENTER, icon, FontId::proportional(17.0), txt.lerp_to_gamma(acc, 0.4 * sk));
+    p.text(rect.left_center() + vec2(x + 28.0, 0.0), Align2::LEFT_CENTER, label, font, txt);
     if resp.clicked() {
         *cur = tab;
     }
@@ -401,10 +428,12 @@ pub(crate) fn hotkeys_ok(c: &Config) -> bool {
 pub(crate) fn card(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
     let fill = ui.visuals().faint_bg_color;
     let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
+    let shadow_a = if ui.visuals().dark_mode { 70 } else { 22 };
     egui::Frame::none()
         .fill(fill)
         .stroke(stroke)
-        .rounding(10.0_f32)
+        .rounding(12.0_f32)
+        .shadow(egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 18.0, spread: 0.0, color: Color32::from_black_alpha(shadow_a) })
         .inner_margin(egui::Margin::same(16.0))
         .show(ui, |ui| {
             ui.set_width(ui.available_width() - 14.0);

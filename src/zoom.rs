@@ -232,7 +232,7 @@ impl Zoom {
         cu.spacing_mut().item_spacing.x = 4.0;
         cu.spacing_mut().button_padding = vec2(8.0, 4.0);
         let area_c = area;
-        if cu.add(egui::Button::new("−").min_size(vec2(34.0, 30.0))).on_hover_text(tr("Zoom arrière (−)")).clicked() {
+        if cu.add(egui::Button::new(crate::icons::MINUS).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Zoom arrière (−)")).clicked() {
             self.step(-1, area_c);
         }
         let pct = (self.scale * 100.0).round() as i32;
@@ -245,11 +245,11 @@ impl Zoom {
                 self.zoom_to(1.0, area_c.center(), area_c);
             }
         }
-        if cu.add(egui::Button::new("+").min_size(vec2(34.0, 30.0))).on_hover_text(tr("Zoom avant (+)")).clicked() {
+        if cu.add(egui::Button::new(crate::icons::PLUS).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Zoom avant (+)")).clicked() {
             self.step(1, area_c);
         }
         cu.separator();
-        if cu.add_enabled(!self.fit, egui::Button::new(tr("Ajuster")).min_size(vec2(0.0, 30.0))).on_hover_text(tr("Adapter à la fenêtre (0)")).clicked() {
+        if cu.add_enabled(!self.fit, egui::Button::new(format!("{}  {}", crate::icons::FIT, tr("Ajuster"))).min_size(vec2(0.0, 30.0))).on_hover_text(tr("Adapter à la fenêtre (0)")).clicked() {
             self.fit();
         }
     }
