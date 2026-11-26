@@ -85,6 +85,21 @@ The script builds in release mode and places `shirokap.exe` at the project root.
 
 Without installing Rust, the GitHub Actions workflow (`.github/workflows/build.yml`) builds the executable and the installer on GitHub's servers (*Actions* tab, then *Artifacts*).
 
+### Build on Linux (Windows executables)
+
+The app itself only runs on Windows, but you can build the Windows files from Linux. Example on Arch:
+
+```
+sudo pacman -S rustup mingw-w64-gcc zip
+rustup default stable
+rustup target add x86_64-pc-windows-gnu
+./build-linux.sh
+```
+
+`dist/` then contains `Shirokap-<version>-portable.exe`, `Shirokap-<version>-portable.zip` and `SHA256SUMS.txt`.
+
+For the installer as well, install Wine (`sudo pacman -S wine`), download [Inno Setup 6](https://jrsoftware.org/isdl.php) and install it in Wine once (`wine innosetup-6.x.x.exe`, default options). `./build-linux.sh` then also creates `Shirokap-Setup-<version>.exe`. Use `./build-linux.sh --no-installer` to skip it.
+
 ### Customize the logo and the sound
 
 Replace the files in `assets/` (same names), then run `build.bat` again: `logo.png`, `logo.ico`, `beep.wav`. See `assets/README.txt`.
@@ -215,6 +230,21 @@ il n'a besoin d'aucune DLL supplémentaire.
 
 Sans installer Rust, le workflow GitHub Actions (`.github/workflows/build.yml`) compile l'exécutable et l'installateur
 sur les serveurs de GitHub (onglet *Actions*, puis *Artifacts*).
+
+### Compiler sous Linux (exécutables Windows)
+
+L'appli ne fonctionne que sous Windows, mais tu peux construire les fichiers Windows depuis Linux. Exemple sous Arch :
+
+```
+sudo pacman -S rustup mingw-w64-gcc zip
+rustup default stable
+rustup target add x86_64-pc-windows-gnu
+./build-linux.sh
+```
+
+`dist/` contient alors `Shirokap-<version>-portable.exe`, `Shirokap-<version>-portable.zip` et `SHA256SUMS.txt`.
+
+Pour avoir aussi l'installateur, installe Wine (`sudo pacman -S wine`), télécharge [Inno Setup 6](https://jrsoftware.org/isdl.php) et installe-le une fois dans Wine (`wine innosetup-6.x.x.exe`, options par défaut). `./build-linux.sh` crée alors aussi `Shirokap-Setup-<version>.exe`. Utilise `./build-linux.sh --no-installer` pour t'en passer.
 
 ### Personnaliser le logo et le son
 
