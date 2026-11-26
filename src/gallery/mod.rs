@@ -515,6 +515,9 @@ impl eframe::App for App {
         if cur != self.applied && self.reveal_req.is_none() {
             if cur.0 != self.applied.0 {
                 let origin = ctx.input(|i| i.pointer.interact_pos().or(i.pointer.hover_pos())).unwrap_or(ctx.screen_rect().center());
+                // un cercle était encore en cours (clics rapides) : on le termine d'un coup pour que la photo
+                // montre le thème précédent en entier, sans frontière ni liseré figés
+                self.reveal = None;
                 self.reveal_req = Some((origin, Instant::now()));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
                 ctx.request_repaint();
