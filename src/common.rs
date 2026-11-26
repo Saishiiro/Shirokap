@@ -60,6 +60,27 @@ pub struct Config {
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
 }
 
+/// Limite les fenêtres à 60 images par seconde (à appeler au début de chaque `update`).
+/// Sans limite, chaque mouvement de souris redessine la fenêtre à la fréquence de l'écran (144 Hz, 165 Hz…)
+/// et le processeur monte pour rien. On dort le temps restant : les mouvements arrivés entre-temps sont traités d'un coup.
+pub fn frame_cap() {
+    use std::cell::Cell;
+    use std::time::{Duration, Instant};
+    thread_local! {
+        static LAST: Cell<Option<Instant>> = const { Cell::new(None) };
+    }
+    let min = Duration::from_micros(16_600);
+    LAST.with(|l| {
+        if let Some(t) = l.get() {
+            let dt = t.elapsed();
+            if dt < min {
+                std::thread::sleep(min - dt);
+            }
+        }
+        l.set(Some(Instant::now()));
+    });
+}
+
 /// Couleur d'accent propre à chaque thème (mode « Auto »).
 pub fn theme_accent(theme: &str) -> [u8; 3] {
     match theme {

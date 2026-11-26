@@ -85,6 +85,7 @@ struct App {
     hwnd: isize,         // fenêtre Windows de la galerie (pour la barre de titre)
     look_key: Option<(bool, [u8; 3])>, // (thème sombre, fond) déjà appliqués à la barre de titre
     cmd: Option<palette::CmdPalette>, // palette de commandes ouverte (Ctrl+K)
+    vis_cache: Option<(u64, std::rc::Rc<VisGroups>)>, // captures affichées et leurs groupes par jour, recalculés seulement si besoin
     thumb_rects: HashMap<usize, Rect>, // position des miniatures affichées (pour l'image qui vole)
     fly_from: Option<Rect>, // miniature d'où part la capture qu'on ouvre
     fly: Option<Fly>,    // image qui vole entre sa miniature et la visionneuse
@@ -179,6 +180,7 @@ impl App {
             theme_anim: None,
             reveal_req: None,
             cmd: None,
+            vis_cache: None,
             thumb_rects: HashMap::new(),
             fly_from: None,
             fly: None,
@@ -235,6 +237,47 @@ impl App {
             cat_at: Instant::now() - Duration::from_secs(1),
             sel_shown: 0,
         }
+    }
+
+    /// Captures affichées et leurs groupes par jour, gardées en cache tant que rien ne change
+    /// (captures, favoris, recherche, dossier, tri, jour, langue) : inutile de tout refaire à chaque image.
+    fn vis_groups(&mut self) -> std::rc::Rc<VisGroups> {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        self.items.len().hash(&mut h);
+        for it in &self.items {
+            it.size.hash(&mut h);
+            it.modified.hash(&mut h);
+        }
+        self.items.first().map(|i| &i.path).hash(&mut h);
+        self.favs.len().hash(&mut h);
+        if self.favs_only {
+            let mut f: Vec<&PathBuf> = self.favs.iter().collect();
+            f.sort();
+            f.hash(&mut h);
+        }
+        (&self.search, &self.folder, self.sort as u8, self.favs_only, crate::i18n::lang()).hash(&mut h);
+        chrono::Local::now().date_naive().hash(&mut h);
+        let key = h.finish();
+        if let Some((k, c)) = &self.vis_cache {
+            if *k == key {
+                return c.clone();
+            }
+        }
+        let vis = self.visible();
+        let by_date = matches!(self.sort, Sort::Newest | Sort::Oldest);
+        let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
+        for &i in &vis {
+            let label = if by_date { day_label(self.items[i].modified) } else { String::new() };
+            if groups.last().map(|g| g.0 == label).unwrap_or(false) {
+                groups.last_mut().unwrap().1.push(i);
+            } else {
+                groups.push((label, vec![i]));
+            }
+        }
+        let c = std::rc::Rc::new(VisGroups { vis, groups });
+        self.vis_cache = Some((key, c.clone()));
+        c
     }
 
     fn visible(&self) -> Vec<usize> {
@@ -357,6 +400,8 @@ impl eframe::App for App {
 
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
+        frame_cap(); // au plus 60 images par seconde
+
         // F11 : plein écran depuis n'importe quel écran ; Échap en sort (hors visionneuse, qui gère son propre Échap)
         if ctx.input(|i| i.key_pressed(Key::F11)) {
             self.toggle_fullscreen(ctx);
@@ -900,6 +945,12 @@ pub(crate) mod anim {
     pub const THEME: f32 = 0.4;
     /// changement de thème (cercle qui révèle le nouveau thème)
     pub const REVEAL: f32 = 0.8;
+}
+
+/// Captures affichées (indices dans `items`) et leurs groupes par jour.
+struct VisGroups {
+    vis: Vec<usize>,
+    groups: Vec<(String, Vec<usize>)>,
 }
 
 /// Image qui « vole » entre sa miniature et la visionneuse (ouverture et fermeture).

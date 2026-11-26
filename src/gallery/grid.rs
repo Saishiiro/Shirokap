@@ -33,10 +33,12 @@ impl App {
             self.compare_ui(ui);
             return;
         }
-        let vis = self.visible();
+        let cache = self.vis_groups();
+        let vis = &cache.vis;
+        let groups = &cache.groups;
         self.stat = (vis.len(), vis.iter().map(|&i| self.items[i].size).sum());
         if let Some(v) = self.view {
-            self.viewer(ui, &ctx, &vis, v);
+            self.viewer(ui, &ctx, vis, v);
             return;
         }
 
@@ -178,22 +180,12 @@ impl App {
         }
         ui.separator();
 
-        // regroupement par jour (si le tri est par date)
-        let by_date = matches!(self.sort, Sort::Newest | Sort::Oldest);
-        let mut groups: Vec<(String, Vec<usize>)> = Vec::new();
-        for &i in &vis {
-            let label = if by_date { day_label(self.items[i].modified) } else { String::new() };
-            if groups.last().map(|g| g.0 == label).unwrap_or(false) {
-                groups.last_mut().unwrap().1.push(i);
-            } else {
-                groups.push((label, vec![i]));
-            }
-        }
         if vis.is_empty() {
             self.empty_state(ui);
             return;
         }
 
+        let by_date = matches!(self.sort, Sort::Newest | Sort::Oldest);
         let acc = self.shown_acc;
         let ctrl = ctx.input(|i| i.modifiers.command || i.modifiers.ctrl);
         let selecting = !self.sel.is_empty();
@@ -210,7 +202,7 @@ impl App {
         let closing_idx = self.fly.as_ref().filter(|f| f.closing && !f.fade).map(|f| f.idx);
         let now = ctx.input(|i| i.time) as f32;
         egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
-            for (label, idxs) in &groups {
+            for (label, idxs) in groups {
                 if !label.is_empty() {
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
