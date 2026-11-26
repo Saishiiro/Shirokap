@@ -22,6 +22,7 @@ impl App {
                     self.full = None;
                     self.items = list_items(&self.cfg.save_dir);
                     self.view = self.items.iter().position(|i| i.path == p);
+                    self.view_dir = 0.0;
                     self.editor = None;
                     self.status = tr("Image enregistrée").into();
                 }
@@ -116,10 +117,36 @@ impl App {
         });
         });
 
+        // nouveau filtre, nouvelle recherche ou nouveau tri : les miniatures réapparaissent en cascade
+        let sig = {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            (&self.folder, &self.search, self.sort as u8, self.favs_only).hash(&mut h);
+            h.finish()
+        };
+        if sig != self.grid_sig {
+            if self.grid_sig != 0 {
+                self.grid_at = Instant::now();
+            }
+            self.grid_sig = sig;
+        }
+
         let mut acts: Vec<Act> = Vec::new();
+        // barre de sélection : elle glisse depuis le haut quand on sélectionne, et se replie ensuite
         if !self.sel.is_empty() {
-            ui.horizontal(|ui| {
-                ui.label(trf("{0} sélectionnée(s)", &[&self.sel.len()]));
+            self.sel_shown = self.sel.len();
+        }
+        let sel_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("selbar"), !self.sel.is_empty(), anim::PAGE, egui::emath::easing::cubic_out);
+        if sel_k > 0.01 {
+            let h = 40.0;
+            let (slot, _) = ui.allocate_exact_size(vec2(ui.available_width(), h * sel_k), Sense::hover());
+            let inner = Rect::from_min_size(slot.min - vec2(0.0, h * (1.0 - sel_k)), vec2(slot.width(), h));
+            let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(inner));
+            bar.set_clip_rect(slot.intersect(ui.clip_rect()));
+            bar.multiply_opacity(sel_k);
+            let n_sel = self.sel_shown;
+            bar.horizontal(|ui| {
+                ui.label(trf("{0} sélectionnée(s)", &[&n_sel]));
                 if self.sel.len() == 2 && ui.button(tr("Comparer")).clicked() {
                     acts.push(Act::Compare);
                 }
@@ -173,6 +200,8 @@ impl App {
         let cw = ((avail - gap * (cols - 1.0)) / cols).floor();
         let ch = (cw * 9.0 / 16.0).floor();
         let mut loads = 0;
+        let mut order = 0usize; // rang de la miniature parmi celles visibles (pour la cascade)
+        let since_grid = self.grid_at.elapsed().as_secs_f32();
         egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             for (label, idxs) in &groups {
                 if !label.is_empty() {
@@ -212,25 +241,34 @@ impl App {
 
                         // --- animations : la carte se soulève au survol, la miniature apparaît en fondu ---
                         let id = ui.id();
-                        let lift = ctx.animate_bool_with_time_and_easing(id.with(("lift", i)), hov, 0.16, egui::emath::easing::cubic_out);
-                        let show_btns = ctx.animate_bool_with_time(id.with(("btns", i)), hov, 0.12);
-                        let show_pick = ctx.animate_bool_with_time(id.with(("pickv", i)), hov || selecting, 0.12);
-                        let check = ctx.animate_bool_with_time_and_easing(id.with(("check", i)), picked, 0.16, egui::emath::easing::back_out);
-                        let fade = self.thumb_born.get(&path).map(|t| ease_out((t.elapsed().as_secs_f32() / 0.25).min(1.0))).unwrap_or(1.0);
-                        if fade < 1.0 {
+                        let lift = ctx.animate_bool_with_time_and_easing(id.with(("lift", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
+                        let show_btns = ctx.animate_bool_with_time_and_easing(id.with(("btns", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
+                        let show_pick = ctx.animate_bool_with_time_and_easing(id.with(("pickv", i)), hov || selecting, anim::HOVER, egui::emath::easing::cubic_out);
+                        let check = ctx.animate_bool_with_time_and_easing(id.with(("check", i)), picked, 0.3, egui::emath::easing::back_out);
+                        let fav_k = ctx.animate_bool_with_time_and_easing(id.with(("favk", i)), fav, 0.35, egui::emath::easing::back_out);
+                        let fav_pop = 1.0 + 0.45 * (1.0 - (2.0 * fav_k - 1.0).abs()).max(0.0); // l'étoile grossit puis revient
+                        let fade = self.thumb_born.get(&path).map(|t| ease_out((t.elapsed().as_secs_f32() / anim::ENTER).min(1.0))).unwrap_or(1.0);
+                        // apparition en cascade : chaque carte arrive un peu après la précédente, en montant
+                        let delay = order.min(24) as f32 * anim::STAGGER;
+                        order += 1;
+                        let ent = ease_out(((since_grid - delay) / anim::ENTER).clamp(0.0, 1.0));
+                        if fade < 1.0 || ent < 1.0 {
                             ctx.request_repaint();
                         }
-                        let rect = rect.translate(vec2(0.0, -3.0 * lift)).expand(1.5 * lift);
+                        let op0 = ui.opacity();
+                        ui.multiply_opacity(ent);
+                        let rect = Rect::from_center_size(rect.center() + vec2(0.0, 18.0 * (1.0 - ent)), rect.size() * (0.94 + 0.06 * ent));
+                        let rect = rect.translate(vec2(0.0, -4.0 * lift)).expand(2.0 * lift);
 
                         // --- miniature arrondie + bandeau d'info ---
                         let rnd = 10.0_f32;
                         let p = ui.painter();
                         if lift > 0.01 {
                             let sh = egui::epaint::Shadow {
-                                offset: vec2(0.0, 8.0 * lift),
-                                blur: 22.0 * lift,
+                                offset: vec2(0.0, 10.0 * lift),
+                                blur: 26.0 * lift,
                                 spread: 0.0,
-                                color: Color32::from_black_alpha((110.0 * lift) as u8),
+                                color: Color32::from_black_alpha((130.0 * lift) as u8),
                             };
                             p.add(sh.as_shape(rect, rnd));
                         }
@@ -260,10 +298,11 @@ impl App {
                         // --- boutons rapides au survol ---
                         let (bg_n, bg_h) = (col(24, 26, 31), col(58, 62, 72));
                         let bs = 28.0_f32;
-                        let r_trash = Rect::from_min_size(pos2(rect.max.x - 8.0 - bs, rect.min.y + 8.0), vec2(bs, bs));
+                        let slide = vec2(0.0, -6.0 * (1.0 - show_btns));
+                        let r_trash = Rect::from_min_size(pos2(rect.max.x - 8.0 - bs, rect.min.y + 8.0), vec2(bs, bs)).translate(slide);
                         let r_copy = r_trash.translate(vec2(-(bs + 6.0), 0.0));
                         let r_fav = r_copy.translate(vec2(-(bs + 6.0), 0.0));
-                        let r_pick = Rect::from_min_size(rect.min + vec2(8.0, 8.0), vec2(bs, bs));
+                        let r_pick = Rect::from_min_size(rect.min + vec2(8.0, 8.0) + vec2(0.0, -6.0 * (1.0 - show_pick)), vec2(bs, bs));
                         let mut hit = false;
                         // cercle de sélection : apparaît en fondu, la coche « rebondit » quand on sélectionne
                         if show_pick > 0.01 {
@@ -311,16 +350,17 @@ impl App {
                                 r_fav.center(),
                                 Align2::CENTER_CENTER,
                                 "★",
-                                FontId::proportional(16.0),
+                                FontId::proportional(16.0 * fav_pop),
                                 if fav { Color32::GOLD } else { Color32::WHITE },
                             );
                         }
                         if fav && show_btns < 0.99 {
                             let mut fp = ui.painter().clone();
                             fp.multiply_opacity(1.0 - show_btns);
-                            fp.text(rect.right_top() + vec2(-10.0, 8.0), Align2::RIGHT_TOP, "★", FontId::proportional(20.0), Color32::GOLD);
+                            fp.text(rect.right_top() + vec2(-10.0, 8.0), Align2::RIGHT_TOP, "★", FontId::proportional(20.0 * fav_pop), Color32::GOLD);
                         }
 
+                        ui.set_opacity(op0);
                         resp.context_menu(|ui| {
                             if ui.button(tr("Copier l'image")).clicked() {
                                 acts.push(Act::Copy(path.clone()));
@@ -378,6 +418,7 @@ impl App {
             match a {
                 Act::Open(i) => {
                     self.view = Some(i);
+                    self.view_dir = 0.0;
                     self.zoom = None;
                 }
                 Act::Pick(p) => {

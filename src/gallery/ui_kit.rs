@@ -192,6 +192,7 @@ pub(crate) fn apply_style(ctx: &egui::Context, cfg: &Config) {
     v.widgets.noninteractive.rounding = round;
     ctx.set_visuals(v);
     ctx.style_mut(|s| {
+        s.animation_time = 0.2; // transitions intégrées d'egui (sections repliables, défilement…)
         s.spacing.item_spacing = vec2(10.0, 10.0);
         s.spacing.button_padding = vec2(14.0, 7.0);
         s.spacing.interact_size.y = 30.0;
@@ -234,9 +235,10 @@ pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
     }
     let hover = ui.visuals().widgets.hovered.weak_bg_fill;
     let color = ui.visuals().text_color();
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let p = ui.painter();
-    if resp.hovered() {
-        p.rect_filled(rect, 8.0, hover);
+    if hk > 0.01 {
+        p.rect_filled(rect, 8.0, hover.gamma_multiply(hk));
     }
     let c = rect.center();
     let st = Stroke::new(1.6_f32, color);
@@ -252,27 +254,28 @@ pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab:
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
+    // survol en fondu ; l'entrée active se teinte, son liseré grandit et le texte se décale un peu
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
     let acc = v.selection.bg_fill;
-    let bg = if selected {
-        Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 45)
-    } else if resp.hovered() {
-        v.widgets.hovered.weak_bg_fill
-    } else {
-        Color32::TRANSPARENT
-    };
+    let hover = v.widgets.hovered.weak_bg_fill;
     let txt = v.text_color();
     let p = ui.painter();
-    p.rect_filled(rect, 8.0, bg);
-    if selected {
-        p.rect_filled(Rect::from_min_size(rect.min + vec2(0.0, 9.0), vec2(3.0, rect.height() - 18.0)), 2.0, acc);
+    if hk * (1.0 - sk) > 0.01 {
+        p.rect_filled(rect, 8.0, hover.gamma_multiply(hk * (1.0 - sk)));
+    }
+    if sk > 0.01 {
+        p.rect_filled(rect, 8.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), (45.0 * sk) as u8));
+        let h = (rect.height() - 18.0) * sk;
+        p.rect_filled(Rect::from_center_size(pos2(rect.min.x + 1.5, rect.center().y), vec2(3.0, h)), 2.0, acc);
     }
     let font = if selected {
         FontId::new(15.0, egui::FontFamily::Name("bold".into()))
     } else {
         FontId::proportional(15.0)
     };
-    p.text(rect.left_center() + vec2(16.0, 0.0), Align2::LEFT_CENTER, label, font, txt);
+    p.text(rect.left_center() + vec2(16.0 + 4.0 * sk, 0.0), Align2::LEFT_CENTER, label, font, txt);
     if resp.clicked() {
         *cur = tab;
     }

@@ -51,7 +51,12 @@ impl App {
                     })
                     .collect();
                 let max = counts.iter().map(|c| c.1).max().unwrap_or(1).max(1);
-                for (label, n) in counts {
+                let since = self.tab_at.elapsed().as_secs_f32();
+                for (row_i, (label, n)) in counts.into_iter().enumerate() {
+                    let grow = ease_out(((since - 0.12 - row_i as f32 * 0.07) / 0.7).clamp(0.0, 1.0));
+                    if grow < 1.0 {
+                        ui.ctx().request_repaint();
+                    }
                     let (row, _) = ui.allocate_exact_size(vec2(480.0, 22.0), Sense::hover());
                     let txt = ui.visuals().text_color();
                     let acc = ui.visuals().selection.bg_fill;
@@ -60,11 +65,12 @@ impl App {
                     p.text(row.left_center(), Align2::LEFT_CENTER, label, FontId::proportional(15.0), txt);
                     let bar = Rect::from_min_size(pos2(row.min.x + 120.0, row.center().y - 7.0), vec2(320.0, 14.0));
                     p.rect_filled(bar, 7.0, track);
-                    if n > 0 {
-                        let w = (bar.width() * n as f32 / max as f32).max(14.0);
-                        p.rect_filled(Rect::from_min_size(bar.min, vec2(w, bar.height())), 7.0, acc);
+                    if n > 0 && grow > 0.0 {
+                        let w = (bar.width() * n as f32 / max as f32).max(14.0) * grow;
+                        p.rect_filled(Rect::from_min_size(bar.min, vec2(w.max(1.0), bar.height())), 7.0, acc);
                     }
-                    p.text(pos2(bar.max.x + 12.0, row.center().y), Align2::LEFT_CENTER, n.to_string(), FontId::proportional(15.0), txt);
+                    let shown_n = (n as f32 * grow).round() as usize;
+                    p.text(pos2(bar.max.x + 12.0, row.center().y), Align2::LEFT_CENTER, shown_n.to_string(), FontId::proportional(15.0), txt);
                 }
             });
             card(ui, tr("Dossiers / jeux"), |ui| {
@@ -330,6 +336,7 @@ impl App {
             if self.slide_at.elapsed() >= Duration::from_secs(3) {
                 self.slide_at = Instant::now();
                 self.view = Some(self.slide_next(vis, v));
+                self.view_dir = 1.0;
                 return;
             }
         }
@@ -344,6 +351,7 @@ impl App {
         let n = pos as i32 + step;
         if step != 0 && n >= 0 && (n as usize) < vis.len() {
             self.view = Some(vis[n as usize]);
+            self.view_dir = step as f32;
             return;
         }
         if self.view.is_none() {
@@ -360,9 +368,17 @@ impl App {
             }
             match self.zoom {
                 None => {
+                    // ouverture : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
+                    let k = ease_out((self.view_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
+                    if k < 1.0 {
+                        ctx.request_repaint();
+                    }
+                    let dir = self.view_dir;
                     ui.vertical_centered(|ui| {
                         let (r, _) = ui.allocate_exact_size(s * fit, Sense::hover());
-                        ui.painter().image(t.id(), r, uv(), Color32::WHITE);
+                        let scale = if dir == 0.0 { 0.9 + 0.1 * k } else { 1.0 };
+                        let shown = Rect::from_center_size(r.center() + vec2(dir * 70.0 * (1.0 - k), 0.0), r.size() * scale);
+                        ui.painter().image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
                     });
                 }
                 Some(z) => {

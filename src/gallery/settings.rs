@@ -22,8 +22,18 @@ impl App {
                     nav_item(ui, &mut self.set_cat, c, n);
                 }
             });
-        let pad = egui::Margin { left: 18.0, right: 0.0, top: 0.0, bottom: 0.0 };
+        // changement de rubrique : le contenu arrive en fondu depuis la droite
+        if self.set_cat != self.shown_cat {
+            self.shown_cat = self.set_cat;
+            self.cat_at = Instant::now();
+        }
+        let k = ease_out((self.cat_at.elapsed().as_secs_f32() / anim::PAGE).min(1.0));
+        if k < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        let pad = egui::Margin { left: 18.0 + 28.0 * (1.0 - k), right: 0.0, top: 0.0, bottom: 0.0 };
         egui::Frame::none().inner_margin(pad).show(ui, |ui| {
+            ui.multiply_opacity(k);
             egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| match self.set_cat {
                 SetCat::Shortcuts => self.set_shortcuts(ui),
                 SetCat::Capture => self.set_capture(ui),

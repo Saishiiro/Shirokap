@@ -112,6 +112,14 @@ struct App {
     show_welcome: bool,
     shown_tab: Tab,      // onglet affiché à l'image précédente
     tab_at: Instant,     // moment du dernier changement d'onglet (pour le fondu)
+    grid_sig: u64,       // filtres de la grille (dossier, recherche, tri…) à l'image précédente
+    grid_at: Instant,    // départ de l'apparition en cascade des miniatures
+    shown_view: Option<usize>, // capture affichée à l'image précédente
+    view_at: Instant,    // ouverture / changement de capture dans la visionneuse
+    view_dir: f32,       // -1 : précédente, 1 : suivante, 0 : ouverture depuis la grille
+    shown_cat: SetCat,   // rubrique des paramètres affichée à l'image précédente
+    cat_at: Instant,     // changement de rubrique des paramètres
+    sel_shown: usize,    // nombre affiché dans la barre de sélection (gardé pendant qu'elle se replie)
 }
 
 pub fn run(settings: bool) {
@@ -181,6 +189,14 @@ impl App {
             show_welcome: !ui_state.welcomed,
             shown_tab: Tab::Gallery,
             tab_at: Instant::now() - Duration::from_secs(1),
+            grid_sig: 0,
+            grid_at: Instant::now(),
+            shown_view: None,
+            view_at: Instant::now(),
+            view_dir: 0.0,
+            shown_cat: SetCat::Shortcuts,
+            cat_at: Instant::now() - Duration::from_secs(1),
+            sel_shown: 0,
         }
     }
 
@@ -324,15 +340,15 @@ impl eframe::App for App {
             Some((msg, age)) => {
                 // la notification glisse vers le haut en apparaissant, puis s'efface en fondu
                 let age = age.as_secs_f32();
-                let enter = ease_out((age / 0.22).min(1.0));
-                let leave = ((3.2 - age) / 0.35).clamp(0.0, 1.0);
-                if age < 0.22 || age > 2.85 {
+                let enter = ease_out((age / anim::ENTER).min(1.0));
+                let leave = ((3.2 - age) / 0.45).clamp(0.0, 1.0);
+                if age < anim::ENTER || age > 2.75 {
                     ctx.request_repaint();
                 } else {
-                    ctx.request_repaint_after(Duration::from_secs_f32(2.85 - age));
+                    ctx.request_repaint_after(Duration::from_secs_f32(2.75 - age));
                 }
                 egui::Area::new(egui::Id::new("toast"))
-                    .anchor(Align2::RIGHT_BOTTOM, vec2(-22.0, -56.0 + 18.0 * (1.0 - enter)))
+                    .anchor(Align2::RIGHT_BOTTOM, vec2(-22.0 + 24.0 * (1.0 - leave), -56.0 + 40.0 * (1.0 - enter)))
                     .order(egui::Order::Foreground)
                     .interactable(false)
                     .show(ctx, |ui| {
@@ -496,7 +512,7 @@ impl eframe::App for App {
         if !immersive {
         let side_fill = palette(&self.cfg.theme).side;
         // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
-        let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, 0.22, egui::emath::easing::cubic_in_out);
+        let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
         let nav_w = 56.0 + (190.0 - 56.0) * open_k;
         let wide = nav_w > 150.0;
         egui::SidePanel::left("nav")
@@ -590,18 +606,30 @@ impl eframe::App for App {
                 .fill(ctx.style().visuals.panel_fill)
                 .inner_margin(egui::Margin::symmetric(22.0, 16.0))
         };
-        // changement d'onglet : le contenu apparaît en fondu en remontant légèrement
+        // changement d'onglet : le contenu apparaît en fondu en remontant
         if self.tab != self.shown_tab {
             self.shown_tab = self.tab;
             self.tab_at = Instant::now();
+            if self.tab == Tab::Gallery {
+                self.grid_at = Instant::now(); // les miniatures réapparaissent en cascade
+            }
         }
-        let tab_k = ease_out((self.tab_at.elapsed().as_secs_f32() / 0.2).min(1.0));
+        // visionneuse : on note quand on ouvre une capture ou qu'on en change ; au retour à la grille, fondu
+        if self.view != self.shown_view {
+            if self.view.is_some() {
+                self.view_at = Instant::now();
+            } else {
+                self.tab_at = Instant::now();
+            }
+            self.shown_view = self.view;
+        }
+        let tab_k = ease_out((self.tab_at.elapsed().as_secs_f32() / anim::PAGE).min(1.0));
         if tab_k < 1.0 {
             ctx.request_repaint();
         }
         egui::CentralPanel::default().frame(content).show(ctx, |ui| {
             ui.multiply_opacity(tab_k);
-            ui.add_space(8.0 * (1.0 - tab_k));
+            ui.add_space(24.0 * (1.0 - tab_k));
             match self.tab {
             Tab::Gallery => self.gallery_ui(ui),
             Tab::Settings => self.settings_ui(ui),
@@ -609,6 +637,20 @@ impl eframe::App for App {
             }
         });
     }
+}
+
+/// Durées des animations, en secondes.
+pub(crate) mod anim {
+    /// survol d'un élément (miniature, bouton, menu)
+    pub const HOVER: f32 = 0.25;
+    /// apparition d'un contenu (miniature, notification, image)
+    pub const ENTER: f32 = 0.45;
+    /// changement d'onglet ou de rubrique
+    pub const PAGE: f32 = 0.38;
+    /// ouverture / repli du menu latéral
+    pub const SIDEBAR: f32 = 0.35;
+    /// décalage entre deux miniatures dans l'apparition en cascade
+    pub const STAGGER: f32 = 0.04;
 }
 
 /// Courbe d'animation : rapide au début, douce à la fin.
