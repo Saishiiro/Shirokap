@@ -245,13 +245,19 @@ impl App {
 
     pub(super) fn set_look(&mut self, ui: &mut egui::Ui) {
         page_head(ui, tr("Apparence"), tr("Le thème et la couleur de l'interface. Les changements sont visibles tout de suite."));
+        // les cartes de thème puis les pastilles d'accent apparaissent en cascade à l'arrivée sur la page
+        let since = self.tab_at.elapsed().min(self.cat_at.elapsed()).as_secs_f32();
+        let appear = |n: usize| ease_out(((since - 0.1 - n as f32 * 0.035) / 0.45).clamp(0.0, 1.0));
+        if appear(THEMES.len() + ACCENTS.len()) < 1.0 {
+            ui.ctx().request_repaint();
+        }
         card(ui, tr("Thème"), |ui| {
             setting(ui, tr("Thème"), tr("Choisis l'ambiance de l'interface : le changement est immédiat."), |ui| {
-                let acc = col(self.cfg.accent[0], self.cfg.accent[1], self.cfg.accent[2]);
+                let acc = self.shown_acc;
                 ui.horizontal_wrapped(|ui| {
-                    for (key, name) in THEMES {
+                    for (n, (key, name)) in THEMES.iter().enumerate() {
                         let pal = palette(key);
-                        if theme_card(ui, self.cfg.theme == key, tr(name), &pal, acc).clicked() {
+                        if theme_card(ui, self.cfg.theme == *key, tr(name), &pal, acc, appear(n)).clicked() {
                             self.cfg.theme = key.to_string();
                         }
                     }
@@ -260,21 +266,42 @@ impl App {
             divider(ui);
             setting(ui, tr("Couleur d'accent"), tr("Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre."), |ui| {
                 ui.horizontal(|ui| {
-                    for c in ACCENTS {
+                    let ctx = ui.ctx().clone();
+                    let now = ctx.input(|i| i.time);
+                    let rip_id = egui::Id::new("accent_ripple");
+                    let ripple = ctx.data(|d| d.get_temp::<(usize, f64)>(rip_id));
+                    for (n, c) in ACCENTS.iter().enumerate() {
                         let (r, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
                         if resp.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
+                        let chosen = self.cfg.accent == *c;
+                        // survol : la pastille grossit ; choix : l'anneau se referme autour en rebondissant
+                        let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::back_out);
+                        let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), chosen, 0.4, egui::emath::easing::back_out);
+                        let k = appear(THEMES.len() + n);
                         let ring = ui.visuals().text_color();
-                        let p = ui.painter();
-                        p.circle_filled(r.center(), 10.0, col(c[0], c[1], c[2]));
-                        if self.cfg.accent == c {
-                            p.circle_stroke(r.center(), 13.0, Stroke::new(2.0_f32, ring));
-                        } else if resp.hovered() {
-                            p.circle_stroke(r.center(), 12.0, Stroke::new(1.2_f32, ring));
+                        let color = col(c[0], c[1], c[2]);
+                        let mut p = ui.painter().clone();
+                        p.multiply_opacity(k);
+                        let center = r.center() + vec2(0.0, 10.0 * (1.0 - k));
+                        p.circle_filled(center, (10.0 + 2.0 * hk) * (0.4 + 0.6 * k), color);
+                        if sk > 0.01 {
+                            p.circle_stroke(center, 10.0 + 3.5 * sk, Stroke::new(2.0 * sk.min(1.0), ring));
+                        } else if hk > 0.01 {
+                            p.circle_stroke(center, 12.5, Stroke::new(1.2_f32, ring.gamma_multiply(hk.min(1.0))));
+                        }
+                        // onde de la couleur choisie
+                        if let Some((rn, t0)) = ripple {
+                            let e = ((now - t0) as f32 / 0.6).clamp(0.0, 1.0);
+                            if rn == n && e < 1.0 {
+                                p.circle_stroke(center, 13.0 + 16.0 * ease_out(e), Stroke::new(2.5 * (1.0 - e), color));
+                                ctx.request_repaint();
+                            }
                         }
                         if resp.clicked() {
-                            self.cfg.accent = c;
+                            self.cfg.accent = *c;
+                            ctx.data_mut(|d| d.insert_temp(rip_id, (n, now)));
                         }
                     }
                     ui.add_space(8.0);

@@ -124,12 +124,38 @@ pub(crate) fn palette(theme: &str) -> Pal {
 }
 
 /// Vignette de choix d'un thème : mini-fenêtre colorée avec le nom dessous.
-pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pal, acc: Color32) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(152.0, 88.0), Sense::click());
+/// `appear` (0 à 1) : apparition de la carte à l'arrivée sur la page.
+pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pal, acc: Color32, appear: f32) -> egui::Response {
+    let (slot, resp) = ui.allocate_exact_size(vec2(152.0, 88.0), Sense::click());
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    let p = ui.painter();
+    let ctx = ui.ctx().clone();
+    let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), super::anim::HOVER, egui::emath::easing::cubic_out);
+    let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), selected, 0.45, egui::emath::easing::back_out);
+    // onde au clic, qui part du point cliqué
+    let rip_id = resp.id.with("ripple");
+    let now = ctx.input(|i| i.time);
+    if resp.clicked() {
+        if let Some(pos) = resp.interact_pointer_pos() {
+            ctx.data_mut(|d| d.insert_temp(rip_id, (pos, now)));
+        }
+    }
+    // la carte arrive en montant, se soulève au survol
+    let rect = Rect::from_center_size(slot.center() + vec2(0.0, 16.0 * (1.0 - appear)), slot.size() * (0.92 + 0.08 * appear));
+    let rect = rect.translate(vec2(0.0, -4.0 * hk)).expand(2.0 * hk);
+    let mut p = ui.painter().clone();
+    p.multiply_opacity(appear);
+    let p = &p;
+    if hk > 0.01 {
+        let sh = egui::epaint::Shadow {
+            offset: vec2(0.0, 8.0 * hk),
+            blur: 22.0 * hk,
+            spread: 0.0,
+            color: Color32::from_black_alpha((110.0 * hk) as u8),
+        };
+        p.add(sh.as_shape(rect, 10.0));
+    }
     p.rect_filled(rect, 10.0, pal.bg);
     let side = Rect::from_min_max(rect.min, pos2(rect.min.x + 34.0, rect.max.y));
     p.rect_filled(side, Rounding { nw: 10.0, sw: 10.0, ne: 0.0, se: 0.0 }, pal.side);
@@ -137,24 +163,60 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
     p.rect_filled(Rect::from_min_size(side.min + vec2(8.0, 24.0), vec2(18.0, 4.0)), 2.0, pal.line);
     let card = Rect::from_min_max(rect.min + vec2(44.0, 10.0), pos2(rect.max.x - 10.0, rect.min.y + 52.0));
     p.rect_filled(card, 6.0, pal.card);
-    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 8.0), vec2(34.0, 8.0)), 4.0, acc);
-    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 22.0), vec2(card.width() - 16.0, 4.0)), 2.0, pal.line);
-    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 31.0), vec2((card.width() - 16.0) * 0.6, 4.0)), 2.0, pal.line);
+    // au survol, la mini-interface « s'anime » : le bouton s'allonge, les lignes de texte se remplissent
+    let inner_w = card.width() - 16.0;
+    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 8.0), vec2(34.0 + (inner_w - 34.0) * 0.45 * hk, 8.0)), 4.0, acc);
+    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 22.0), vec2(inner_w * (0.85 + 0.15 * hk), 4.0)), 2.0, pal.line);
+    p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 31.0), vec2(inner_w * (0.6 + 0.3 * hk), 4.0)), 2.0, pal.line);
     p.text(pos2(rect.min.x + 44.0, rect.max.y - 17.0), Align2::LEFT_CENTER, name, FontId::proportional(13.0), pal.text);
-    if selected {
-        p.rect_stroke(rect, 10.0, Stroke::new(2.5_f32, acc));
-    } else if resp.hovered() {
-        p.rect_stroke(rect, 10.0, Stroke::new(1.5_f32, pal.stroke_hov));
-    } else {
-        p.rect_stroke(rect, 10.0, Stroke::new(1.0_f32, pal.line));
+    if let Some((pos, t0)) = ctx.data(|d| d.get_temp::<(Pos2, f64)>(rip_id)) {
+        let e = ((now - t0) as f32 / 0.65).clamp(0.0, 1.0);
+        if e < 1.0 {
+            let r = ease_out(e) * rect.width() * 1.15;
+            p.with_clip_rect(rect.intersect(p.clip_rect())).circle_filled(pos, r, acc.gamma_multiply(0.35 * (1.0 - e)));
+            ctx.request_repaint();
+        }
+    }
+    // contour : il prend la couleur d'accent et s'épaissit quand la carte devient le thème actif
+    let s = sk.clamp(0.0, 1.0);
+    let base = pal.line.lerp_to_gamma(pal.stroke_hov, hk);
+    p.rect_stroke(rect, 10.0, Stroke::new(1.0 + 1.5 * s, base.lerp_to_gamma(acc, s)));
+    if sk > 0.01 {
+        // pastille « coché » qui apparaît en rebondissant
+        let c = rect.right_top() + vec2(-14.0, 14.0);
+        p.circle_filled(c, 9.0 * sk.max(0.0), acc);
+        if sk > 0.5 {
+            icon_check(p, c, on_accent(acc));
+        }
     }
     resp
 }
 
 /// Thème sobre : gris neutres + une seule couleur d'accent.
 pub(crate) fn apply_style(ctx: &egui::Context, cfg: &Config) {
-    let pal = palette(&cfg.theme);
-    let acc = accent(cfg);
+    apply_style_with(ctx, &palette(&cfg.theme), accent(cfg));
+}
+
+/// Mélange de deux palettes (t = 0 : `a`, t = 1 : `b`), pour passer d'un thème à l'autre en douceur.
+pub(crate) fn lerp_pal(a: &Pal, b: &Pal, t: f32) -> Pal {
+    let m = |x: Color32, y: Color32| x.lerp_to_gamma(y, t);
+    Pal {
+        dark: if t < 0.5 { a.dark } else { b.dark },
+        bg: m(a.bg, b.bg),
+        side: m(a.side, b.side),
+        card: m(a.card, b.card),
+        input: m(a.input, b.input),
+        button: m(a.button, b.button),
+        hover: m(a.hover, b.hover),
+        line: m(a.line, b.line),
+        stroke_in: m(a.stroke_in, b.stroke_in),
+        stroke_hov: m(a.stroke_hov, b.stroke_hov),
+        text: m(a.text, b.text),
+    }
+}
+
+pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
+    let pal = *pal;
     let (bg, card, input, hover, button, line, text) = (pal.bg, pal.card, pal.input, pal.hover, pal.button, pal.line, pal.text);
     let mut v = if pal.dark { egui::Visuals::dark() } else { egui::Visuals::light() };
     v.override_text_color = Some(text);

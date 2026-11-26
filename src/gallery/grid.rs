@@ -138,12 +138,16 @@ impl App {
         }
         let sel_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("selbar"), !self.sel.is_empty(), anim::PAGE, egui::emath::easing::cubic_out);
         if sel_k > 0.01 {
-            let h = 40.0;
+            let h = 46.0;
             let (slot, _) = ui.allocate_exact_size(vec2(ui.available_width(), h * sel_k), Sense::hover());
             let inner = Rect::from_min_size(slot.min - vec2(0.0, h * (1.0 - sel_k)), vec2(slot.width(), h));
             let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(inner));
-            bar.set_clip_rect(slot.intersect(ui.clip_rect()));
+            // on ne coupe que pendant l'animation (une fois dépliée, la barre s'affiche en entier)
+            if sel_k < 0.999 {
+                bar.set_clip_rect(slot.expand2(vec2(4.0, 0.0)).intersect(ui.clip_rect()));
+            }
             bar.multiply_opacity(sel_k);
+            bar.add_space(6.0); // les boutons dépassent un peu la hauteur de ligne : on les décale vers le bas
             let n_sel = self.sel_shown;
             bar.horizontal(|ui| {
                 ui.label(trf("{0} sélectionnée(s)", &[&n_sel]));
@@ -190,7 +194,7 @@ impl App {
             });
         }
 
-        let acc = accent(&self.cfg);
+        let acc = self.shown_acc;
         let ctrl = ctx.input(|i| i.modifiers.command || i.modifiers.ctrl);
         let selecting = !self.sel.is_empty();
         // la grille remplit toute la largeur : le nombre de colonnes dépend de la taille souhaitée

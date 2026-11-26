@@ -138,7 +138,7 @@ impl App {
         let (mut del, mut step, mut tfav, mut edit, mut ren, mut cpath) = (false, 0i32, false, false, false, false);
         let (mut annotate, mut pin, mut cfile) = (false, false, false);
 
-        let acc = accent(&self.cfg);
+        let acc = self.shown_acc;
         let danger = col(239, 68, 68);
         if !self.fullscreen {
         ui.horizontal_wrapped(|ui| {

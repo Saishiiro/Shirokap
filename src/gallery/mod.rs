@@ -77,6 +77,9 @@ struct App {
     cfg: Config,
     saved: String,
     applied: (String, [u8; 3]),
+    shown_pal: Pal,      // palette affichée (mélange pendant un changement de thème)
+    shown_acc: Color32,  // couleur d'accent affichée
+    theme_anim: Option<(Pal, Color32, Instant)>, // départ d'un changement de thème : couleurs d'origine + moment
     applied_lang: String,
     fonts_cjk: bool, // police chinoise actuellement chargée
     tab: Tab,
@@ -149,6 +152,9 @@ impl App {
             items: list_items(&cfg.save_dir),
             saved: toml::to_string(&cfg).unwrap_or_default(),
             applied: (cfg.theme.clone(), cfg.accent),
+            shown_pal: palette(&cfg.theme),
+            shown_acc: accent(&cfg),
+            theme_anim: None,
             applied_lang: cfg.language.clone(),
             fonts_cjk: lang() == ZH,
             cfg,
@@ -407,7 +413,7 @@ impl eframe::App for App {
                 }
             }
             let dir = self.cfg.save_dir.clone();
-            let acc = accent(&self.cfg);
+            let acc = self.shown_acc;
             egui::Window::new(tr("Bienvenue"))
                 .title_bar(false)
                 .collapsible(false)
@@ -497,10 +503,22 @@ impl eframe::App for App {
             install_fonts_with(ctx, need_cjk);
             self.fonts_cjk = need_cjk;
         }
+        // changement de thème ou d'accent : toutes les couleurs glissent de l'ancienne palette à la nouvelle
         let cur = (self.cfg.theme.clone(), self.cfg.accent);
         if cur != self.applied {
-            apply_style(ctx, &self.cfg); // aperçu en direct du thème
+            self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
             self.applied = cur;
+        }
+        if let Some((from_pal, from_acc, t0)) = self.theme_anim {
+            let t = egui::emath::easing::cubic_in_out((t0.elapsed().as_secs_f32() / anim::THEME).min(1.0));
+            self.shown_pal = lerp_pal(&from_pal, &palette(&self.cfg.theme), t);
+            self.shown_acc = from_acc.lerp_to_gamma(accent(&self.cfg), t);
+            apply_style_with(ctx, &self.shown_pal, self.shown_acc);
+            if t >= 1.0 {
+                self.theme_anim = None;
+            } else {
+                ctx.request_repaint();
+            }
         }
         let foc = ctx.input(|i| i.focused);
         if foc && !self.focused {
@@ -510,7 +528,7 @@ impl eframe::App for App {
 
         let immersive = self.fullscreen && self.view.is_some() && self.editor.is_none() && self.compare.is_none();
         if !immersive {
-        let side_fill = palette(&self.cfg.theme).side;
+        let side_fill = self.shown_pal.side;
         // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
         let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
         let nav_w = 56.0 + (190.0 - 56.0) * open_k;
@@ -651,6 +669,8 @@ pub(crate) mod anim {
     pub const SIDEBAR: f32 = 0.35;
     /// décalage entre deux miniatures dans l'apparition en cascade
     pub const STAGGER: f32 = 0.04;
+    /// passage d'un thème (ou d'une couleur d'accent) à l'autre
+    pub const THEME: f32 = 0.6;
 }
 
 /// Courbe d'animation : rapide au début, douce à la fin.
