@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 297] = [
+pub static TABLE: [[&str; 5]; 308] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -145,7 +145,7 @@ pub static TABLE: [[&str; 5]; 297] = [
     ["Dans la galerie", "In the gallery", "En la galería", "In der Galerie", "在图库中"],
     ["Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer", "Click: open  ·  Ctrl+click: select  ·  right-click: menu  ·  drag images onto it: import them", "Clic: abrir  ·  Ctrl+clic: seleccionar  ·  clic derecho: menú  ·  arrastrar imágenes encima: importarlas", "Klick: öffnen  ·  Strg+Klick: auswählen  ·  Rechtsklick: Menü  ·  Bilder hineinziehen: importieren", "单击：打开  ·  Ctrl+单击：选择  ·  右键：菜单  ·  拖入图片：导入"],
     ["Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral", "Ctrl+A: select all  ·  Del: Recycle Bin  ·  Esc: deselect  ·  Ctrl+B: side menu", "Ctrl+A: seleccionar todo  ·  Supr: papelera  ·  Esc: deseleccionar  ·  Ctrl+B: menú lateral", "Strg+A: alles auswählen  ·  Entf: Papierkorb  ·  Esc: Auswahl aufheben  ·  Strg+B: Seitenmenü", "Ctrl+A：全选  ·  Del：回收站  ·  Esc：取消选择  ·  Ctrl+B：侧边菜单"],
-    ["Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  Ctrl+molette zoom", "Viewer: ← → browse  ·  F favorite  ·  Space slideshow  ·  F11 full screen  ·  Ctrl+wheel zoom", "Visor: ← → navegar  ·  F favorito  ·  Espacio presentación  ·  F11 pantalla completa  ·  Ctrl+rueda zoom", "Bildbetrachter: ← → blättern  ·  F Favorit  ·  Leertaste Diashow  ·  F11 Vollbild  ·  Strg+Mausrad Zoom", "查看器：← → 浏览  ·  F 收藏  ·  空格 幻灯片  ·  F11 全屏  ·  Ctrl+滚轮 缩放"],
+    ["Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom", "Viewer: ← → browse  ·  F favorite  ·  Space slideshow  ·  F11 full screen  ·  wheel zoom", "Visor: ← → navegar  ·  F favorito  ·  Espacio presentación  ·  F11 pantalla completa  ·  rueda zoom", "Bildbetrachter: ← → blättern  ·  F Favorit  ·  Leertaste Diashow  ·  F11 Vollbild  ·  Mausrad Zoom", "查看器：← → 浏览  ·  F 收藏  ·  空格 幻灯片  ·  F11 全屏  ·  滚轮 缩放"],
     ["Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer", "Pinned screenshot: drag to move  ·  wheel to resize  ·  right-click or Esc to close", "Captura fijada: arrastra para mover  ·  rueda para el tamaño  ·  clic derecho o Esc para cerrar", "Angeheftete Aufnahme: ziehen zum Verschieben  ·  Mausrad für die Größe  ·  Rechtsklick oder Esc zum Schließen", "固定的截图：拖动以移动  ·  滚轮调整大小  ·  右键或 Esc 关闭"],
     ["Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu", "Tray icon: left-click = gallery  ·  middle-click = capture  ·  right-click = menu", "Icono de la bandeja: clic izquierdo = galería  ·  clic central = captura  ·  clic derecho = menú", "Infobereich-Symbol: Linksklick = Galerie  ·  Mittelklick = Aufnahme  ·  Rechtsklick = Menü", "托盘图标：左键 = 图库  ·  中键 = 截图  ·  右键 = 菜单"],
     ["Comment l'écran est capturé, et ce qui se passe juste après.", "How the screen is captured, and what happens right after.", "Cómo se captura la pantalla y qué ocurre justo después.", "Wie der Bildschirm aufgenommen wird und was direkt danach passiert.", "屏幕如何截取，以及截取后的操作。"],
@@ -300,4 +300,15 @@ pub static TABLE: [[&str; 5]; 297] = [
     ["Sélectionner toutes les captures affichées (Ctrl+A)", "Select all displayed screenshots (Ctrl+A)", "Seleccionar todas las capturas mostradas (Ctrl+A)", "Alle angezeigten Aufnahmen auswählen (Strg+A)", "选择所有显示的截图（Ctrl+A）"],
     ["Ouvrir le dossier", "Open folder", "Abrir carpeta", "Ordner öffnen", "打开文件夹"],
     ["Ouvrir le dossier des captures dans l'Explorateur", "Open the screenshots folder in File Explorer", "Abrir la carpeta de capturas en el Explorador", "Aufnahmeordner im Explorer öffnen", "在资源管理器中打开截图文件夹"],
+    ["Glacier", "Glacier", "Glaciar", "Gletscher", "冰川"],
+    ["Moka", "Mocha", "Moca", "Mokka", "摩卡"],
+    ["Néon", "Neon", "Neón", "Neon", "霓虹"],
+    ["Sakura", "Sakura", "Sakura", "Sakura", "樱花"],
+    ["Ciel", "Sky", "Cielo", "Himmel", "天空"],
+    ["Zoom arrière (−)", "Zoom out (−)", "Alejar (−)", "Verkleinern (−)", "缩小（−）"],
+    ["Zoom avant (+)", "Zoom in (+)", "Acercar (+)", "Vergrößern (+)", "放大（+）"],
+    ["Taille réelle (1)", "Actual size (1)", "Tamaño real (1)", "Originalgröße (1)", "实际大小（1）"],
+    ["Adapter à la fenêtre (0)", "Fit to window (0)", "Ajustar a la ventana (0)", "An Fenster anpassen (0)", "适应窗口（0）"],
+    ["Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle", "Wheel: zoom · drag: move · double-click: fit / actual size", "Rueda: zoom · arrastrar: mover · doble clic: ajustar / tamaño real", "Mausrad: Zoom · Ziehen: verschieben · Doppelklick: einpassen / Originalgröße", "滚轮：缩放 · 拖动：移动 · 双击：适应 / 实际大小"],
+    ["Molette : zoom · clic molette ou Espace + glisser : déplacer", "Wheel: zoom · middle-click or Space + drag: move", "Rueda: zoom · clic central o Espacio + arrastrar: mover", "Mausrad: Zoom · Mittelklick oder Leertaste + Ziehen: verschieben", "滚轮：缩放 · 中键或空格 + 拖动：移动"],
 ];

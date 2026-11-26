@@ -227,13 +227,6 @@ impl App {
                     ui.close_menu();
                 }
             });
-            ui.separator();
-            if ui.button(tr("Ajuster")).on_hover_text(tr("Adapter à la fenêtre")).clicked() {
-                self.zoom = None;
-            }
-            if ui.button("100 %").on_hover_text(tr("Taille réelle (Ctrl + molette pour zoomer)")).clicked() {
-                self.zoom = Some(1.0);
-            }
         });
         }
         let dims = handle.as_ref().map(|t| format!("{}×{}", t.size()[0], t.size()[1])).unwrap_or_default();
@@ -359,35 +352,21 @@ impl App {
         }
 
         if let Some(t) = handle {
+            // zoom : molette vers le curseur, glisser pour déplacer, double-clic, + − 0 1 ; barre flottante en bas
             let s = t.size_vec2();
-            let a = ui.available_size();
-            let fit = (a.x / s.x).min(a.y / s.y).min(1.0);
-            let zd = ctx.input(|i| i.zoom_delta()); // Ctrl + molette
-            if zd != 1.0 {
-                self.zoom = Some((self.zoom.unwrap_or(fit) * zd).clamp(0.05, 8.0));
+            let (area, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+            let keys = !ctx.wants_keyboard_input() && self.rename.is_none();
+            let r = self.zoom.update(ui, &resp, area, s, crate::zoom::Pan::Primary, keys, true);
+            // ouverture : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
+            let k = ease_out((self.view_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
+            if k < 1.0 {
+                ctx.request_repaint();
             }
-            match self.zoom {
-                None => {
-                    // ouverture : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
-                    let k = ease_out((self.view_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
-                    if k < 1.0 {
-                        ctx.request_repaint();
-                    }
-                    let dir = self.view_dir;
-                    ui.vertical_centered(|ui| {
-                        let (r, _) = ui.allocate_exact_size(s * fit, Sense::hover());
-                        let scale = if dir == 0.0 { 0.9 + 0.1 * k } else { 1.0 };
-                        let shown = Rect::from_center_size(r.center() + vec2(dir * 70.0 * (1.0 - k), 0.0), r.size() * scale);
-                        ui.painter().image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
-                    });
-                }
-                Some(z) => {
-                    egui::ScrollArea::both().show(ui, |ui| {
-                        let (r, _) = ui.allocate_exact_size(s * z, Sense::hover());
-                        ui.painter().image(t.id(), r, uv(), Color32::WHITE);
-                    });
-                }
-            }
+            let dir = self.view_dir;
+            let grow = if dir == 0.0 { 0.9 + 0.1 * k } else { 1.0 };
+            let shown = Rect::from_center_size(r.center() + vec2(dir * 70.0 * (1.0 - k), 0.0), r.size() * grow);
+            ui.painter_at(area).image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
+            self.zoom.controls(ui, area, tr("Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle"));
         }
     }
 }

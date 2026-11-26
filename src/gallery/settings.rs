@@ -120,7 +120,7 @@ impl App {
             for l in [
                 tr("Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer"),
                 tr("Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral"),
-                tr("Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  Ctrl+molette zoom"),
+                tr("Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom"),
                 tr("Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer"),
                 tr("Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu"),
             ] {

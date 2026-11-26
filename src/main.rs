@@ -19,6 +19,7 @@ mod picker;
 mod pin;
 mod region;
 mod trayui;
+mod zoom;
 
 fn main() {
     common::dpi_aware(); // indispensable pour capturer en vraie résolution (4K) avec la mise à l'échelle Windows

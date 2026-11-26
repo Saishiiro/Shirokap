@@ -79,7 +79,9 @@ struct App {
     applied: (String, [u8; 3]),
     shown_pal: Pal,      // palette affichée (mélange pendant un changement de thème)
     shown_acc: Color32,  // couleur d'accent affichée
-    theme_anim: Option<(Pal, Color32, Instant)>, // départ d'un changement de thème : couleurs d'origine + moment
+    theme_anim: Option<(Pal, Color32, Instant)>, // départ d'un changement d'accent : couleurs d'origine + moment
+    reveal_req: Option<(Pos2, Instant)>, // changement de thème : capture de l'ancien thème demandée (origine du cercle, moment)
+    reveal: Option<(TextureHandle, Pos2, Instant)>, // ancien thème en image, qu'un cercle grandissant découvre
     applied_lang: String,
     fonts_cjk: bool, // police chinoise actuellement chargée
     tab: Tab,
@@ -95,7 +97,7 @@ struct App {
     thumb_born: HashMap<PathBuf, Instant>, // moment du chargement de chaque miniature (pour son fondu)
     view: Option<usize>,
     full: Option<(PathBuf, TextureHandle)>,
-    zoom: Option<f32>,
+    zoom: crate::zoom::Zoom,
     autostart: bool,
     focused: bool,
     status: String,
@@ -155,6 +157,8 @@ impl App {
             shown_pal: palette(&cfg.theme),
             shown_acc: accent(&cfg),
             theme_anim: None,
+            reveal_req: None,
+            reveal: None,
             applied_lang: cfg.language.clone(),
             fonts_cjk: lang() == ZH,
             cfg,
@@ -175,7 +179,7 @@ impl App {
             thumb_born: HashMap::new(),
             view: None,
             full: None,
-            zoom: None,
+            zoom: Default::default(),
             autostart: autostart_enabled(),
             focused: true,
             status: String::new(),
@@ -503,11 +507,45 @@ impl eframe::App for App {
             install_fonts_with(ctx, need_cjk);
             self.fonts_cjk = need_cjk;
         }
-        // changement de thème ou d'accent : toutes les couleurs glissent de l'ancienne palette à la nouvelle
+        // Changement de thème : un cercle part du clic et grandit en révélant le nouveau thème.
+        // On photographie d'abord l'écran avec l'ancien thème (la capture arrive à l'image suivante),
+        // puis on applique le nouveau dessous et on dessine la photo par-dessus, percée d'un cercle qui grandit.
+        // Changement de la seule couleur d'accent : fondu des couleurs.
         let cur = (self.cfg.theme.clone(), self.cfg.accent);
-        if cur != self.applied {
-            self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
-            self.applied = cur;
+        if cur != self.applied && self.reveal_req.is_none() {
+            if cur.0 != self.applied.0 {
+                let origin = ctx.input(|i| i.pointer.interact_pos().or(i.pointer.hover_pos())).unwrap_or(ctx.screen_rect().center());
+                self.reveal_req = Some((origin, Instant::now()));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
+                ctx.request_repaint();
+            } else {
+                self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
+                self.applied = cur;
+            }
+        }
+        if let Some((origin, asked)) = self.reveal_req {
+            let shot = ctx.input(|i| {
+                i.raw.events.iter().find_map(|e| match e {
+                    egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                    _ => None,
+                })
+            });
+            if shot.is_some() || asked.elapsed() > Duration::from_millis(400) {
+                if let Some(img) = shot {
+                    let tex = ctx.load_texture("theme_reveal", (*img).clone(), egui::TextureOptions::LINEAR);
+                    self.reveal = Some((tex, origin, Instant::now()));
+                    self.theme_anim = None;
+                    self.shown_pal = palette(&self.cfg.theme);
+                    self.shown_acc = accent(&self.cfg);
+                    apply_style_with(ctx, &self.shown_pal, self.shown_acc);
+                } else {
+                    // pas de capture possible (pilote graphique) : simple fondu
+                    self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
+                }
+                self.applied = (self.cfg.theme.clone(), self.cfg.accent);
+                self.reveal_req = None;
+            }
+            ctx.request_repaint();
         }
         if let Some((from_pal, from_acc, t0)) = self.theme_anim {
             let t = egui::emath::easing::cubic_in_out((t0.elapsed().as_secs_f32() / anim::THEME).min(1.0));
@@ -636,6 +674,7 @@ impl eframe::App for App {
         if self.view != self.shown_view {
             if self.view.is_some() {
                 self.view_at = Instant::now();
+                self.zoom = Default::default(); // chaque capture s'ouvre en entier
             } else {
                 self.tab_at = Instant::now();
             }
@@ -654,7 +693,50 @@ impl eframe::App for App {
             Tab::Stats => self.stats_ui(ui),
             }
         });
+
+        // par-dessus tout : l'ancien thème, percé d'un cercle qui grandit depuis le clic
+        if let Some((tex, origin, t0)) = &self.reveal {
+            let t = (t0.elapsed().as_secs_f32() / anim::REVEAL).min(1.0);
+            let e = egui::emath::easing::cubic_in_out(t);
+            let screen = ctx.screen_rect();
+            let far = [screen.left_top(), screen.right_top(), screen.left_bottom(), screen.right_bottom()]
+                .iter()
+                .map(|c| c.distance(*origin))
+                .fold(0.0_f32, f32::max);
+            let r = e * (far + 4.0);
+            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("theme_reveal")));
+            painter.add(egui::Shape::mesh(reveal_mesh(tex.id(), screen, *origin, r, far * 1.6 + 200.0)));
+            // fin liseré lumineux à la frontière, aux couleurs du nouveau thème
+            if r > 1.0 {
+                painter.circle_stroke(*origin, r, Stroke::new(2.0_f32, self.shown_acc.gamma_multiply(0.8 * (1.0 - t))));
+            }
+            if t >= 1.0 {
+                self.reveal = None; // la capture est libérée
+            } else {
+                ctx.request_repaint();
+            }
+        }
     }
+}
+
+/// Toute la fenêtre sauf un disque (centre `c`, rayon `r`), texturée avec la capture de l'écran.
+fn reveal_mesh(tex: egui::TextureId, screen: Rect, c: Pos2, r: f32, outer: f32) -> egui::Mesh {
+    let mut m = egui::Mesh::with_texture(tex);
+    let uv = |p: Pos2| pos2((p.x - screen.min.x) / screen.width(), (p.y - screen.min.y) / screen.height());
+    let n = 120u32;
+    for i in 0..=n {
+        let a = i as f32 / n as f32 * std::f32::consts::TAU;
+        let d = vec2(a.cos(), a.sin());
+        for p in [c + d * r, c + d * outer] {
+            m.vertices.push(egui::epaint::Vertex { pos: p, uv: uv(p), color: Color32::WHITE });
+        }
+    }
+    for i in 0..n {
+        let k = 2 * i;
+        m.add_triangle(k, k + 1, k + 2);
+        m.add_triangle(k + 1, k + 3, k + 2);
+    }
+    m
 }
 
 /// Durées des animations, en secondes.
@@ -669,8 +751,10 @@ pub(crate) mod anim {
     pub const SIDEBAR: f32 = 0.35;
     /// décalage entre deux miniatures dans l'apparition en cascade
     pub const STAGGER: f32 = 0.04;
-    /// passage d'un thème (ou d'une couleur d'accent) à l'autre
-    pub const THEME: f32 = 0.6;
+    /// changement de couleur d'accent (fondu)
+    pub const THEME: f32 = 0.4;
+    /// changement de thème (cercle qui révèle le nouveau thème)
+    pub const REVEAL: f32 = 0.8;
 }
 
 /// Courbe d'animation : rapide au début, douce à la fin.

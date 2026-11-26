@@ -80,6 +80,7 @@ pub struct Editor {
     status: String,
     confirm: bool, // confirmation avant de remplacer l'original
     dirty: Option<[u32; 4]>, // zone à renvoyer à la carte graphique (gomme)
+    zoom: crate::zoom::Zoom, // zoom et déplacement dans l'image
 }
 
 fn rgb(c: [u8; 3]) -> Color32 {
@@ -495,6 +496,7 @@ impl Editor {
             status: String::new(),
             confirm: false,
             dirty: None,
+            zoom: Default::default(),
         })
     }
 
@@ -748,15 +750,22 @@ impl Editor {
             }
         }
 
-        let avail = ui.available_size();
+        // zone de dessin : toute la place restante ; l'image s'y affiche avec le zoom
+        // (molette : zoom · clic molette ou Espace + glisser : déplacer · + − 0 1 au clavier)
         let isz = vec2(self.img.width() as f32, self.img.height() as f32);
-        let scale = (avail.x / isz.x).min(avail.y / isz.y).min(1.0).max(0.02);
-        let (rect, resp) = ui.allocate_exact_size(isz * scale, Sense::click_and_drag());
+        let (area, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+        let pan = crate::zoom::Pan::Middle { space: self.cur.is_none() && self.pending.is_none() };
+        let keys = self.pending.is_none() && !ui.ctx().wants_keyboard_input();
+        let rect = self.zoom.update(ui, &resp, area, isz, pan, keys, false);
+        let scale = rect.width() / isz.x;
         let to_img = |s: Pos2| ((s - rect.min) / scale).to_pos2();
+        let panning = self.zoom.panning(ui, &resp, pan);
+        let space = ui.input(|i| i.key_down(Key::Space)) && self.pending.is_none() && self.cur.is_none();
+        let on_img = |p: Pos2| rect.contains(p);
 
         // ----- clics simples -----
-        if resp.clicked() {
-            if let Some(pos) = resp.interact_pointer_pos() {
+        if resp.clicked() && !space {
+            if let Some(pos) = resp.interact_pointer_pos().filter(|&p| on_img(p)) {
                 let q = to_img(pos);
                 match self.tool {
                     Tool::Text => {
@@ -783,9 +792,9 @@ impl Editor {
                 }
             }
         }
-        // ----- glisser -----
-        if resp.drag_started() {
-            if let Some(pos) = resp.interact_pointer_pos() {
+        // ----- glisser (bouton gauche ; la molette enfoncée et Espace servent à déplacer l'image) -----
+        if resp.drag_started_by(egui::PointerButton::Primary) && !space && !panning {
+            if let Some(pos) = resp.interact_pointer_pos().filter(|&p| on_img(p)) {
                 let q = to_img(pos);
                 let (col, w) = (self.col, self.width);
                 match self.tool {
@@ -803,7 +812,7 @@ impl Editor {
                 }
             }
         }
-        if resp.dragged() {
+        if resp.dragged_by(egui::PointerButton::Primary) && self.cur.is_some() {
             if let Some(pos) = resp.interact_pointer_pos() {
                 let q = to_img(pos);
                 let mut stamp: Option<(Pos2, f32)> = None;
@@ -825,7 +834,7 @@ impl Editor {
                 }
             }
         }
-        if resp.drag_stopped() {
+        if resp.drag_stopped_by(egui::PointerButton::Primary) {
             if let Some(op) = self.cur.take() {
                 let applied = matches!(op, Op::Erase { .. });
                 self.commit(op, applied);
@@ -836,7 +845,7 @@ impl Editor {
         }
 
         // ----- affichage -----
-        let p = ui.painter_at(rect);
+        let p = ui.painter_at(area.intersect(rect));
         p.image(self.tex.id(), rect, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
         if let Some(op) = &self.cur {
             if !matches!(op, Op::Erase { .. }) {
@@ -865,7 +874,9 @@ impl Editor {
             Tool::Step => Some(self.tsize * 0.7),
             _ => None,
         };
-        if resp.hovered() {
+        if space && resp.hovered() && !panning {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab); // Espace enfoncé : prêt à déplacer
+        } else if resp.hovered() && !panning && resp.hover_pos().map(on_img).unwrap_or(false) {
             ui.ctx().set_cursor_icon(match self.tool {
                 Tool::Pen | Tool::Eraser | Tool::Step | Tool::Text => egui::CursorIcon::None,
                 _ => egui::CursorIcon::Crosshair,
@@ -889,6 +900,8 @@ impl Editor {
                 }
             }
         }
+
+        self.zoom.controls(ui, area, tr("Molette : zoom · clic molette ou Espace + glisser : déplacer"));
 
         if let Some(replace) = save {
             let img = self.render();

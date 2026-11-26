@@ -423,7 +423,6 @@ impl App {
                 Act::Open(i) => {
                     self.view = Some(i);
                     self.view_dir = 0.0;
-                    self.zoom = None;
                 }
                 Act::Pick(p) => {
                     if !self.sel.remove(&p) {
