@@ -11,7 +11,7 @@ impl App {
         if !dropped.is_empty() {
             let n = dropped.iter().filter(|p| import_file(&self.cfg, p)).count();
             self.items = list_items(&self.cfg.save_dir);
-            self.status = trf("{0} image(s) importée(s)", &[&n]);
+            self.status = ic(icons::IMAGE_PLUS, &trf("{0} image(s) importée(s)", &[&n]));
         }
         if let Some(ed) = &mut self.editor {
             match ed.ui(ui) {
@@ -24,7 +24,7 @@ impl App {
                     self.view = self.items.iter().position(|i| i.path == p);
                     self.view_dir = 0.0;
                     self.editor = None;
-                    self.status = tr("Image enregistrée").into();
+                    self.status = ic(icons::SUCCESS, tr("Image enregistrée"));
                 }
             }
             return;
@@ -434,7 +434,7 @@ impl App {
                 Act::Copy(p) => {
                     if let Ok(i) = image::open(&p) {
                         copy_to_clipboard(&i.to_rgba8());
-                        self.status = tr("Image copiée dans le presse-papiers").into();
+                        self.status = ic(icons::COPY, tr("Image copiée dans le presse-papiers"));
                     }
                 }
                 Act::Reveal(p) => {
@@ -443,7 +443,7 @@ impl App {
                 Act::Trash(v) => self.trash(v),
                 Act::Path(p) => {
                     copy_text(&p.display().to_string());
-                    self.status = tr("Chemin copié").into();
+                    self.status = ic(icons::LINK, tr("Chemin copié"));
                 }
                 Act::Edit(p) => self.edit(&p),
                 Act::Rename(p) => {
@@ -457,12 +457,12 @@ impl App {
                 Act::Annotate(p) => self.editor = Editor::open(&ctx, &p),
                 Act::CopyFile(p) => {
                     copy_files(&[p]);
-                    self.status = tr("Fichier copié : Ctrl+V dans l'Explorateur, un mail…").into();
+                    self.status = ic(icons::COPY, tr("Fichier copié : Ctrl+V dans l'Explorateur, un mail…"));
                 }
                 Act::CopyFiles => {
                     let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
                     copy_files(&v);
-                    self.status = trf("{0} fichier(s) copié(s)", &[&v.len()]);
+                    self.status = ic(icons::COPY, &trf("{0} fichier(s) copié(s)", &[&v.len()]));
                 }
                 Act::Export => {
                     if let Some(d) = rfd::FileDialog::new().pick_folder() {
@@ -474,7 +474,7 @@ impl App {
                                 }
                             }
                         }
-                        self.status = trf("{0} fichier(s) exporté(s)", &[&n]);
+                        self.status = ic(icons::EXPORT, &trf("{0} fichier(s) exporté(s)", &[&n]));
                     }
                 }
                 Act::Compare => {

@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 310] = [
+pub static TABLE: [[&str; 5]; 311] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -313,4 +313,5 @@ pub static TABLE: [[&str; 5]; 310] = [
     ["Molette : zoom · clic molette ou Espace + glisser : déplacer", "Wheel: zoom · middle-click or Space + drag: move", "Rueda: zoom · clic central o Espacio + arrastrar: mover", "Mausrad: Zoom · Mittelklick oder Leertaste + Ziehen: verschieben", "滚轮：缩放 · 中键或空格 + 拖动：移动"],
     ["Auto|accent", "Auto", "Auto", "Auto", "自动"],
     ["Couleur du thème : l'accent suit le thème choisi", "Theme color: the accent follows the chosen theme", "Color del tema: el acento sigue el tema elegido", "Themenfarbe: Der Akzent folgt dem gewählten Thema", "主题颜色：强调色随所选主题变化"],
+    ["{0} capture(s) mise(s) à la corbeille", "{0} screenshot(s) moved to the Recycle Bin", "{0} captura(s) movida(s) a la papelera", "{0} Aufnahme(n) in den Papierkorb verschoben", "已将 {0} 张截图移到回收站"],
 ];

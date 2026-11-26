@@ -645,7 +645,7 @@ impl Editor {
             }
             if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
                 copy_to_clipboard(&self.render());
-                self.status = tr("Copiée dans le presse-papiers").into();
+                self.status = format!("{}  {}", icons::COPY, tr("Copiée dans le presse-papiers"));
             }
             let acc = ui.visuals().selection.bg_fill;
             let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc))).fill(acc);
@@ -918,7 +918,7 @@ impl Editor {
                 make_thumb(&img, &thumb_path(&dest));
                 exit = Exit::Saved(dest);
             } else {
-                self.status = tr("Échec de l'enregistrement").into();
+                self.status = format!("{}  {}", icons::ALERT, tr("Échec de l'enregistrement"));
             }
         }
         exit

@@ -3,6 +3,7 @@
 use crate::common::*;
 use crate::i18n::*;
 use crate::gallery::ui_kit::{accent, apply_style, install_fonts, palette, Pal};
+use crate::icons;
 use eframe::egui::{self, pos2, vec2, Align2, Color32, FontId, Rect, Sense, Stroke};
 use std::time::{Duration, Instant};
 use windows_sys::Win32::{
@@ -12,8 +13,8 @@ use windows_sys::Win32::{
 };
 
 const MARGIN: f32 = 14.0; // espace transparent autour des cartes (ombre)
-const CARD_W: f32 = 276.0;
-const FLY_W: f32 = 306.0; // largeur du sous-menu
+const CARD_W: f32 = 290.0;
+const FLY_W: f32 = 340.0; // largeur du sous-menu
 const GAP: f32 = 8.0;
 const PAD: f32 = 8.0;
 const ROW_H: f32 = 34.0;
@@ -23,8 +24,8 @@ const INFO_H: f32 = 26.0;
 enum It {
     Info(String),
     Sep,
-    Act { id: String, label: String, hint: String, checked: Option<bool> },
-    Sub { label: String, kids: Vec<It> },
+    Act { id: String, icon: &'static str, label: String, hint: String, checked: Option<bool> },
+    Sub { icon: &'static str, label: String, kids: Vec<It> },
 }
 
 fn item_h(it: &It) -> f32 {
@@ -41,24 +42,26 @@ fn card_h(items: &[It]) -> f32 {
 
 /// Même contenu et mêmes commandes que le menu natif.
 fn model(cfg: &Config, paused: bool, auto: bool) -> Vec<It> {
-    let act = |id: &str, label: &str, hint: &str| It::Act {
+    let act = |id: &str, icon: &'static str, label: &str, hint: &str| It::Act {
         id: id.to_string(),
+        icon,
         label: label.to_string(),
         hint: hint.to_string(),
         checked: None,
     };
-    let chk = |id: &str, label: &str, on: bool| It::Act {
+    let chk = |id: &str, icon: &'static str, label: &str, on: bool| It::Act {
         id: id.to_string(),
+        icon,
         label: label.to_string(),
         hint: String::new(),
         checked: Some(on),
     };
     let today = today_label(today_count(cfg));
     let mut quick = vec![
-        chk("tog_clip", tr("Copier dans le presse-papiers"), cfg.clipboard),
-        chk("tog_sound", tr("Bip sonore"), cfg.sound),
-        chk("tog_flash", tr("Clignotement de l'icône"), cfg.flash),
-        chk("tog_folder", tr("Un dossier par fenêtre / jeu"), cfg.folder_per_window),
+        chk("tog_clip", "", tr("Copier dans le presse-papiers"), cfg.clipboard),
+        chk("tog_sound", "", tr("Bip sonore"), cfg.sound),
+        chk("tog_flash", "", tr("Clignotement de l'icône"), cfg.flash),
+        chk("tog_folder", "", tr("Un dossier par fenêtre / jeu"), cfg.folder_per_window),
         It::Sep,
     ];
     for (w, l) in [
@@ -68,49 +71,55 @@ fn model(cfg: &Config, paused: bool, auto: bool) -> Vec<It> {
         (1920, "1080p · 1920 px"),
         (1280, "720p · 1280 px"),
     ] {
-        quick.push(chk(&format!("res:{w}"), l, cfg.target_width == w));
+        quick.push(chk(&format!("res:{w}"), "", l, cfg.target_width == w));
     }
     vec![
         It::Info(format!("Shirokap {}", env!("CARGO_PKG_VERSION"))),
         It::Info(today),
         It::Sep,
         It::Sub {
+            icon: icons::CAMERA,
             label: tr("Capturer").to_string(),
             kids: vec![
-                act("snap", tr("Écran entier"), &cfg.hotkey),
-                act("zone", tr("Zone…"), &cfg.hotkey_region),
-                act("zone_clip", tr("Zone → presse-papiers"), &cfg.hotkey_region_clip),
-                act("snap_last", tr("Refaire la dernière zone"), &cfg.hotkey_last_region),
+                act("snap", icons::SYSTEM, tr("Écran entier"), &cfg.hotkey),
+                act("zone", icons::ZONE, tr("Zone…"), &cfg.hotkey_region),
+                act("zone_clip", icons::CLIPBOARD, tr("Zone → presse-papiers"), &cfg.hotkey_region_clip),
+                act("snap_last", icons::HISTORY, tr("Refaire la dernière zone"), &cfg.hotkey_last_region),
                 It::Sep,
-                act("delayed_screen", tr("Écran dans 5 secondes"), ""),
-                act("delayed_window", tr("Fenêtre active dans 5 secondes"), ""),
+                act("delayed_screen", icons::TIMER, tr("Écran dans 5 secondes"), ""),
+                act("delayed_window", icons::APP_WINDOW, tr("Fenêtre active dans 5 secondes"), ""),
                 It::Sep,
-                act("pick", tr("Pipette : couleur sous le curseur (3 s)"), &cfg.hotkey_picker),
+                act("pick", icons::PIPETTE, tr("Pipette : couleur sous le curseur (3 s)"), &cfg.hotkey_picker),
             ],
         },
-        chk("auto", tr("Capture automatique (timelapse)"), auto),
+        chk("auto", icons::CLOCK, tr("Capture automatique (timelapse)"), auto),
         It::Sep,
-        act("gallery", tr("Ouvrir la galerie"), &cfg.hotkey_gallery),
+        act("gallery", icons::GALLERY, tr("Ouvrir la galerie"), &cfg.hotkey_gallery),
         It::Sub {
+            icon: icons::IMAGE,
             label: tr("Dernière capture").to_string(),
             kids: vec![
-                act("last", tr("Ouvrir"), ""),
-                act("copy_last", tr("Copier dans le presse-papiers"), ""),
-                act("pin_last", tr("Épingler à l'écran"), ""),
+                act("last", icons::EXTERNAL, tr("Ouvrir"), ""),
+                act("copy_last", icons::COPY, tr("Copier dans le presse-papiers"), ""),
+                act("pin_last", icons::PIN, tr("Épingler à l'écran"), ""),
                 It::Sep,
-                act("trash_last", tr("Mettre à la corbeille"), ""),
+                act("trash_last", icons::TRASH, tr("Mettre à la corbeille"), ""),
             ],
         },
         It::Sub {
+            icon: icons::FOLDER,
             label: tr("Dossiers").to_string(),
-            kids: vec![act("folder", tr("Dossier des captures"), ""), act("config_dir", tr("Dossier de configuration"), "")],
+            kids: vec![
+                act("folder", icons::FOLDER_OPEN, tr("Dossier des captures"), ""),
+                act("config_dir", icons::FOLDER_COG, tr("Dossier de configuration"), ""),
+            ],
         },
         It::Sep,
-        It::Sub { label: tr("Réglages rapides").to_string(), kids: quick },
-        chk("pause", tr("Suspendre les raccourcis"), paused),
-        act("settings", tr("Paramètres…"), ""),
+        It::Sub { icon: icons::SLIDERS, label: tr("Réglages rapides").to_string(), kids: quick },
+        chk("pause", icons::PAUSE, tr("Suspendre les raccourcis"), paused),
+        act("settings", icons::SETTINGS, tr("Paramètres…"), ""),
         It::Sep,
-        act("quit", tr("Quitter"), ""),
+        act("quit", icons::POWER, tr("Quitter"), ""),
     ]
 }
 
@@ -128,7 +137,9 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
     p.rect_filled(rect, 12.0, pal.card);
     p.rect_stroke(rect, 12.0, Stroke::new(1.0_f32, pal.line));
     let has_check = items.iter().any(|i| matches!(i, It::Act { checked: Some(_), .. }));
-    let gutter = if has_check { 32.0 } else { 14.0 };
+    let has_icon = items.iter().any(|i| matches!(i, It::Act { icon, .. } | It::Sub { icon, .. } if !icon.is_empty()));
+    let gutter = if has_icon { 42.0 } else if has_check { 32.0 } else { 14.0 };
+    let icon_font = FontId::proportional(16.0);
     let t = pal.text;
     let weak = Color32::from_rgba_unmultiplied(t.r(), t.g(), t.b(), 135);
     let mut y = rect.min.y + PAD;
@@ -143,14 +154,24 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
             It::Info(text) => {
                 p.text(pos2(row.min.x + 14.0, row.center().y), Align2::LEFT_CENTER, text, FontId::proportional(12.5), weak);
             }
-            It::Act { id, label, hint, checked } => {
+            It::Act { id, icon, label, hint, checked } => {
                 let resp = ui.interact(row, egui::Id::new((salt, n)), Sense::click());
                 if resp.hovered() {
                     p.rect_filled(row, 8.0, pal.hover);
                     out.hover_plain = true;
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
-                if *checked == Some(true) {
+                let on = *checked == Some(true);
+                if !icon.is_empty() {
+                    // icône à gauche ; une option cochée a son icône dans la couleur d'accent et une coche à droite
+                    p.text(pos2(row.min.x + 14.0, row.center().y), Align2::LEFT_CENTER, *icon, icon_font.clone(), if on { acc } else { t });
+                    if on && hint.is_empty() {
+                        let c = pos2(row.max.x - 16.0, row.center().y);
+                        let st = Stroke::new(2.0_f32, acc);
+                        p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
+                        p.line_segment([c + vec2(-1.5, 3.5), c + vec2(4.5, -3.5)], st);
+                    }
+                } else if on {
                     let c = pos2(row.min.x + 16.0, row.center().y);
                     let st = Stroke::new(2.0_f32, acc);
                     p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
@@ -164,7 +185,7 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
                     out.chosen = Some(id.clone());
                 }
             }
-            It::Sub { label, .. } => {
+            It::Sub { icon, label, .. } => {
                 let resp = ui.interact(row, egui::Id::new((salt, n)), Sense::click());
                 if resp.hovered() || active_sub == Some(n) {
                     p.rect_filled(row, 8.0, pal.hover);
@@ -172,6 +193,9 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
                 if resp.hovered() {
                     out.hover_sub = Some(n);
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if !icon.is_empty() {
+                    p.text(pos2(row.min.x + 14.0, row.center().y), Align2::LEFT_CENTER, *icon, icon_font.clone(), t);
                 }
                 p.text(pos2(row.min.x + gutter, row.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), t);
                 let c = pos2(row.max.x - 16.0, row.center().y);

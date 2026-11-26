@@ -155,7 +155,7 @@ impl App {
             if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image dans le presse-papiers")).clicked() {
                 if let Ok(i) = image::open(&path) {
                     copy_to_clipboard(&i.to_rgba8());
-                    self.status = tr("Image copiée dans le presse-papiers").into();
+                    self.status = ic(icons::COPY, tr("Image copiée dans le presse-papiers"));
                 }
             }
             let annot = egui::Button::new(egui::RichText::new(ic(icons::ANNOTATE, tr("Annoter"))).color(on_accent(acc))).fill(acc);
@@ -211,7 +211,7 @@ impl App {
                     self.slideshow = !self.slideshow;
                     self.slide_at = Instant::now();
                     if self.slideshow {
-                        self.status = trf("Diaporama : {0}", &[&self.slide_label()]);
+                        self.status = ic(icons::PLAY, &trf("Diaporama : {0}", &[&self.slide_label()]));
                     }
                     ui.close_menu();
                 }
@@ -243,7 +243,7 @@ impl App {
         }
         if cfile {
             copy_files(&[path.clone()]);
-            self.status = tr("Fichier copié").into();
+            self.status = ic(icons::COPY, tr("Fichier copié"));
         }
         if annotate {
             self.editor = Editor::open(ctx, &path);
@@ -254,7 +254,7 @@ impl App {
         }
         if cpath {
             copy_text(&path.display().to_string());
-            self.status = tr("Chemin copié").into();
+            self.status = ic(icons::LINK, tr("Chemin copié"));
         }
         if ren {
             let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
@@ -322,7 +322,7 @@ impl App {
             self.slideshow = !self.slideshow;
             self.slide_at = Instant::now();
             if self.slideshow && !self.fullscreen {
-                self.status = trf("Diaporama : {0}", &[&self.slide_label()]);
+                self.status = ic(icons::PLAY, &trf("Diaporama : {0}", &[&self.slide_label()]));
             }
         }
         if self.slideshow {

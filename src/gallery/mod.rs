@@ -261,7 +261,12 @@ impl App {
                 self.sel.remove(p);
             }
         }
+        let before = self.items.len();
         self.items.retain(|it| it.path.exists());
+        let gone = before - self.items.len();
+        if gone > 0 {
+            self.status = ic(icons::TRASH, &trf("{0} capture(s) mise(s) à la corbeille", &[&gone]));
+        }
         self.full = None;
         save_favs(&self.favs);
     }
@@ -296,7 +301,7 @@ impl App {
         let ext = old.extension().and_then(|e| e.to_str()).unwrap_or("png");
         let newp = old.with_file_name(format!("{stem}.{ext}"));
         if newp.exists() {
-            self.status = tr("Ce nom existe déjà").into();
+            self.status = ic(icons::ALERT, tr("Ce nom existe déjà"));
             return;
         }
         if std::fs::rename(old, &newp).is_ok() {
@@ -312,7 +317,7 @@ impl App {
                 self.view = self.items.iter().position(|it| it.path == newp);
             }
             self.full = None;
-            self.status = tr("Capture renommée").into();
+            self.status = ic(icons::RENAME, tr("Capture renommée"));
         }
     }
 
@@ -381,7 +386,29 @@ impl eframe::App for App {
                     .show(ctx, |ui| {
                         ui.multiply_opacity(enter.min(leave));
                         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(16.0, 10.0)).show(ui, |ui| {
-                            ui.label(msg);
+                            // un message qui commence par une icône : l'icône est mise en couleur (réussite, erreur…)
+                            let mut chars = msg.chars();
+                            match chars.next() {
+                                Some(c) if ('\u{f700}'..='\u{f7ff}').contains(&c) => {
+                                    let icon = c.to_string();
+                                    let color = if icon == icons::ALERT {
+                                        col(239, 68, 68)
+                                    } else if icon == icons::TRASH {
+                                        col(248, 113, 113)
+                                    } else if icon == icons::SUCCESS {
+                                        col(34, 197, 94)
+                                    } else {
+                                        self.shown_acc
+                                    };
+                                    ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new(icon).size(17.0).color(color));
+                                        ui.label(chars.as_str().trim_start());
+                                    });
+                                }
+                                _ => {
+                                    ui.label(msg);
+                                }
+                            }
                         });
                     });
             }
@@ -689,7 +716,7 @@ impl eframe::App for App {
                             self.cfg.save(); // le démon relit la config tout seul
                             self.saved = toml::to_string(&self.cfg).unwrap_or_default();
                             self.items = list_items(&self.cfg.save_dir);
-                            self.status = tr("Enregistré ✔").into();
+                            self.status = ic(icons::SUCCESS, tr("Enregistré ✔").trim_end_matches('✔').trim_end());
                         }
                         if ui.add_enabled(dirty, egui::Button::new(ic(icons::UNDO, tr("Annuler")))).clicked() {
                             self.cfg = Config::load();

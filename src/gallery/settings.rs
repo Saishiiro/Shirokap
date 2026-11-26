@@ -87,7 +87,7 @@ impl App {
             SetCat::Privacy => c.blocklist = d.blocklist,
             SetCat::System => c.language = d.language,
         }
-        self.status = tr("Rubrique réinitialisée : pense à enregistrer").into();
+        self.status = ic(icons::RESET, tr("Rubrique réinitialisée : pense à enregistrer"));
     }
 
     pub(super) fn reset_row(&mut self, ui: &mut egui::Ui, cat: SetCat) {
