@@ -90,6 +90,9 @@ impl App {
             ui.toggle_value(&mut self.favs_only, tr("★ Favoris"));
             ui.weak(tr("Taille"));
             ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false));
+            if ui.add(egui::Button::new(icons::COMMAND).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Palette de commandes (Ctrl+K)")).clicked() {
+                self.cmd = Some(palette::CmdPalette::new());
+            }
             if ui.add(egui::Button::new(icons::REFRESH).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Actualiser")).clicked() {
                 self.items = list_items(&self.cfg.save_dir);
             }
@@ -187,11 +190,8 @@ impl App {
             }
         }
         if vis.is_empty() {
-            ui.add_space(30.0);
-            ui.vertical_centered(|ui| {
-                ui.heading(tr("Aucune capture"));
-                ui.label(trf("Appuie sur {0} pour capturer : tes captures apparaîtront ici.", &[&self.cfg.hotkey]));
-            });
+            self.empty_state(ui);
+            return;
         }
 
         let acc = self.shown_acc;
@@ -206,6 +206,9 @@ impl App {
         let mut loads = 0;
         let mut order = 0usize; // rang de la miniature parmi celles visibles (pour la cascade)
         let since_grid = self.grid_at.elapsed().as_secs_f32();
+        self.thumb_rects.clear();
+        let closing_idx = self.fly.as_ref().filter(|f| f.closing && !f.fade).map(|f| f.idx);
+        let now = ctx.input(|i| i.time) as f32;
         egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             for (label, idxs) in &groups {
                 if !label.is_empty() {
@@ -233,6 +236,7 @@ impl App {
                         }
                         let fav = self.favs.contains(&path);
                         let picked = self.sel.contains(&path);
+                        self.thumb_rects.insert(i, rect);
                         let hov = ui.rect_contains_pointer(rect);
                         let dt = chrono::DateTime::<chrono::Local>::from(modified);
                         let when = if by_date { dt.format("%H:%M").to_string() } else { dt.format(&format!("{} %H:%M", dfmt(false))).to_string() };
@@ -277,11 +281,24 @@ impl App {
                             p.add(sh.as_shape(rect, rnd));
                         }
                         p.rect_filled(rect, rnd, ui.visuals().faint_bg_color);
-                        if let Some(Some(t)) = self.thumbs.get(&path) {
-                            egui::Image::new(egui::load::SizedTexture::new(t.id(), rect.size()))
-                                .rounding(rnd)
-                                .tint(Color32::from_white_alpha((fade * 255.0) as u8))
-                                .paint_at(ui, rect);
+                        match self.thumbs.get(&path) {
+                            // la capture qui revient de la visionneuse se pose ici : on n'affiche pas la miniature en double
+                            Some(Some(_)) if closing_idx == Some(i) => {}
+                            Some(Some(t)) => {
+                                egui::Image::new(egui::load::SizedTexture::new(t.id(), rect.size()))
+                                    .rounding(rnd)
+                                    .tint(Color32::from_white_alpha((fade * 255.0) as u8))
+                                    .paint_at(ui, rect);
+                            }
+                            // miniature illisible : simple icône
+                            Some(None) => {
+                                p.text(rect.center(), Align2::CENTER_CENTER, icons::IMAGE, FontId::proportional(28.0), ui.visuals().weak_text_color());
+                            }
+                            // pas encore chargée : reflet qui balaie la carte en attendant
+                            None => {
+                                shimmer(p, rect, now + i as f32 * 0.07, ui.visuals().dark_mode);
+                                ctx.request_repaint();
+                            }
                         }
                         let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 24.0), rect.max);
                         let bar_r = Rounding { nw: 0.0, ne: 0.0, sw: rnd, se: rnd };
@@ -422,6 +439,7 @@ impl App {
         for a in acts {
             match a {
                 Act::Open(i) => {
+                    self.fly_from = self.thumb_rects.get(&i).copied();
                     self.view = Some(i);
                     self.view_dir = 0.0;
                 }
@@ -486,6 +504,92 @@ impl App {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/// Reflet clair qui balaie une carte vide (miniature en cours de chargement).
+fn shimmer(p: &egui::Painter, rect: Rect, t: f32, dark: bool) {
+    let w = rect.width() * 0.55;
+    let x = rect.min.x - w + (t * 0.8).rem_euclid(1.6) / 1.6 * (rect.width() + 2.0 * w);
+    let a = if dark { 22 } else { 70 };
+    let clear = Color32::TRANSPARENT;
+    let shine = Color32::from_white_alpha(a);
+    let mut m = egui::Mesh::default();
+    let (y0, y1) = (rect.min.y, rect.max.y);
+    for (dx, c) in [(0.0, clear), (w / 2.0, shine), (w, clear)] {
+        m.colored_vertex(pos2(x + dx, y0), c);
+        m.colored_vertex(pos2(x + dx, y1), c);
+    }
+    m.add_triangle(0, 1, 2);
+    m.add_triangle(1, 3, 2);
+    m.add_triangle(2, 3, 4);
+    m.add_triangle(3, 5, 4);
+    p.with_clip_rect(rect.shrink(1.0).intersect(p.clip_rect())).add(m);
+}
+
+impl App {
+    /// Écrans vides : aucune capture, aucun résultat de recherche, aucun favori, dossier vide.
+    fn empty_state(&mut self, ui: &mut egui::Ui) {
+        let (icon, title, text, button): (&str, String, String, String) = if self.items.is_empty() {
+            (
+                icons::CAMERA,
+                tr("Aucune capture pour l'instant").to_string(),
+                trf("Appuie sur {0} pour capturer l'écran, ou {1} pour une zone : tes captures apparaîtront ici.", &[&self.cfg.hotkey, &self.cfg.hotkey_region]),
+                ic(icons::FOLDER_OPEN, tr("Ouvrir le dossier")),
+            )
+        } else if !self.search.is_empty() {
+            (
+                icons::SEARCH_X,
+                trf("Aucun résultat pour « {0} »", &[&self.search]),
+                tr("Essaie un autre mot, ou cherche par date (par exemple 2026-11).").to_string(),
+                ic(icons::CLOSE, tr("Effacer la recherche")),
+            )
+        } else if self.favs_only {
+            (
+                icons::STAR_OFF,
+                tr("Aucun favori").to_string(),
+                tr("Survole une capture et clique sur l'étoile, ou appuie sur F dans la visionneuse.").to_string(),
+                ic(icons::GALLERY, tr("Afficher toutes les captures")),
+            )
+        } else {
+            (icons::FOLDER, tr("Ce dossier est vide").to_string(), String::new(), ic(icons::FOLDER, tr("Tous les dossiers")))
+        };
+        // apparition : l'illustration monte en fondu
+        let k = ease_out((self.grid_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
+        if k < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        let acc = self.shown_acc;
+        let mut clicked = false;
+        ui.add_space(ui.available_height() * 0.18 + 20.0 * (1.0 - k));
+        ui.vertical_centered(|ui| {
+            ui.multiply_opacity(k);
+            let (r, _) = ui.allocate_exact_size(vec2(96.0, 96.0), Sense::hover());
+            let p = ui.painter();
+            p.circle_filled(r.center(), 46.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 28));
+            p.circle_filled(r.center(), 34.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 45));
+            p.text(r.center(), Align2::CENTER_CENTER, icon, FontId::proportional(36.0), acc);
+            ui.add_space(14.0);
+            ui.label(bold_text(&title, 20.0));
+            if !text.is_empty() {
+                ui.add_space(4.0);
+                ui.weak(text);
+            }
+            ui.add_space(14.0);
+            clicked = ui.button(button).clicked();
+        });
+        if clicked {
+            if self.items.is_empty() {
+                let _ = std::fs::create_dir_all(&self.cfg.save_dir);
+                let _ = Command::new("explorer").arg(&self.cfg.save_dir).spawn();
+            } else if !self.search.is_empty() {
+                self.search.clear();
+            } else if self.favs_only {
+                self.favs_only = false;
+            } else {
+                self.folder.clear();
             }
         }
     }

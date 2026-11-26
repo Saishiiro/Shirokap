@@ -358,7 +358,20 @@ impl App {
             let (area, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
             let keys = !ctx.wants_keyboard_input() && self.rename.is_none();
             let r = self.zoom.update(ui, &resp, area, s, crate::zoom::Pan::Primary, keys, true);
-            // ouverture : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
+            self.view_rect = Some(r);
+            // ouverture depuis la grille : l'image vole depuis sa miniature (dessinée par-dessus, voir `Fly`)
+            if let Some(from) = self.fly_from.take() {
+                self.fly = Some(Fly { tex: t.clone(), from, to: r, t0: Instant::now(), closing: false, fade: false, idx: v });
+                self.view_at = Instant::now() - Duration::from_secs(2);
+            }
+            let flying = match self.fly.as_mut() {
+                Some(f) if !f.closing => {
+                    f.to = r;
+                    true
+                }
+                _ => false,
+            };
+            // ouverture sans miniature : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
             let k = ease_out((self.view_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
             if k < 1.0 {
                 ctx.request_repaint();
@@ -366,7 +379,9 @@ impl App {
             let dir = self.view_dir;
             let grow = if dir == 0.0 { 0.9 + 0.1 * k } else { 1.0 };
             let shown = Rect::from_center_size(r.center() + vec2(dir * 70.0 * (1.0 - k), 0.0), r.size() * grow);
-            ui.painter_at(area).image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
+            if !flying {
+                ui.painter_at(area).image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
+            }
             self.zoom.controls(ui, area, tr("Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle"));
         }
     }

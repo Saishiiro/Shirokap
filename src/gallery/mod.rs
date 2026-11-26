@@ -14,6 +14,7 @@ use std::{
 };
 
 mod grid;
+mod palette;
 mod hotkeys;
 mod settings;
 pub(crate) mod ui_kit;
@@ -83,6 +84,11 @@ struct App {
     theme_anim: Option<(Pal, Color32, Instant)>, // départ d'un changement d'accent : couleurs d'origine + moment
     hwnd: isize,         // fenêtre Windows de la galerie (pour la barre de titre)
     look_key: Option<(bool, [u8; 3])>, // (thème sombre, fond) déjà appliqués à la barre de titre
+    cmd: Option<palette::CmdPalette>, // palette de commandes ouverte (Ctrl+K)
+    thumb_rects: HashMap<usize, Rect>, // position des miniatures affichées (pour l'image qui vole)
+    fly_from: Option<Rect>, // miniature d'où part la capture qu'on ouvre
+    fly: Option<Fly>,    // image qui vole entre sa miniature et la visionneuse
+    view_rect: Option<Rect>, // dernière position de l'image dans la visionneuse
     reveal_req: Option<(Pos2, Instant)>, // changement de thème : capture de l'ancien thème demandée (origine du cercle, moment)
     reveal: Option<(TextureHandle, Pos2, Instant)>, // ancien thème en image, qu'un cercle grandissant découvre
     applied_lang: String,
@@ -172,6 +178,11 @@ impl App {
             shown_acc: accent(&cfg),
             theme_anim: None,
             reveal_req: None,
+            cmd: None,
+            thumb_rects: HashMap::new(),
+            fly_from: None,
+            fly: None,
+            view_rect: None,
             hwnd,
             look_key: None,
             reveal: None,
@@ -749,6 +760,10 @@ impl eframe::App for App {
                 .fill(ctx.style().visuals.panel_fill)
                 .inner_margin(egui::Margin::symmetric(22.0, 16.0))
         };
+        // palette de commandes : son clavier passe avant les autres raccourcis
+        let pending = self.palette_keys(ctx);
+        self.run_pending_cmd(ctx, pending);
+
         // changement d'onglet : le contenu apparaît en fondu en remontant
         if self.tab != self.shown_tab {
             self.shown_tab = self.tab;
@@ -764,6 +779,23 @@ impl eframe::App for App {
                 self.zoom = Default::default(); // chaque capture s'ouvre en entier
             } else {
                 self.tab_at = Instant::now();
+                // fermeture : l'image rejoint sa miniature (ou rétrécit en s'effaçant si elle n'est pas à l'écran)
+                if let (Some(i), Some(from), Some((p, tex))) = (self.shown_view, self.view_rect, self.full.as_ref()) {
+                    if self.items.get(i).map(|it| &it.path == p).unwrap_or(false) {
+                        let to = self.thumb_rects.get(&i).copied();
+                        self.fly = Some(Fly {
+                            tex: tex.clone(),
+                            from,
+                            to: to.unwrap_or_else(|| Rect::from_center_size(from.center(), from.size() * 0.6)),
+                            t0: Instant::now(),
+                            closing: true,
+                            fade: to.is_none(),
+                            idx: i,
+                        });
+                    }
+                }
+                self.view_rect = None;
+                self.fly_from = None;
             }
             self.shown_view = self.view;
         }
@@ -780,6 +812,30 @@ impl eframe::App for App {
             Tab::Stats => self.stats_ui(ui),
             }
         });
+
+        // l'image qui vole entre la miniature et la visionneuse
+        if let Some(f) = &self.fly {
+            let t = (f.t0.elapsed().as_secs_f32() / anim::FLY).min(1.0);
+            let e = egui::emath::easing::cubic_in_out(t);
+            let rect = f.from.lerp_towards(&f.to, e);
+            let round = if f.closing { 10.0 * e } else { 10.0 * (1.0 - e) };
+            let alpha = if f.fade { 1.0 - e } else { 1.0 };
+            let mut shape = egui::epaint::RectShape::filled(rect, round, Color32::from_white_alpha((alpha * 255.0) as u8));
+            shape.fill_texture_id = f.tex.id();
+            shape.uv = Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0));
+            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("fly")));
+            if !f.fade {
+                let sh = egui::epaint::Shadow { offset: vec2(0.0, 10.0), blur: 30.0, spread: 0.0, color: Color32::from_black_alpha((120.0 * (1.0 - (2.0 * e - 1.0).abs())) as u8) };
+                painter.add(sh.as_shape(rect, round));
+            }
+            painter.add(shape);
+            if t >= 1.0 {
+                self.fly = None;
+            } else {
+                ctx.request_repaint();
+            }
+        }
+        self.palette_ui(ctx);
 
         // par-dessus tout : l'ancien thème, percé d'un cercle qui grandit depuis le clic
         if let Some((tex, origin, t0)) = &self.reveal {
@@ -838,10 +894,23 @@ pub(crate) mod anim {
     pub const SIDEBAR: f32 = 0.35;
     /// décalage entre deux miniatures dans l'apparition en cascade
     pub const STAGGER: f32 = 0.04;
+    /// vol d'une capture entre sa miniature et la visionneuse
+    pub const FLY: f32 = 0.42;
     /// changement de couleur d'accent (fondu)
     pub const THEME: f32 = 0.4;
     /// changement de thème (cercle qui révèle le nouveau thème)
     pub const REVEAL: f32 = 0.8;
+}
+
+/// Image qui « vole » entre sa miniature et la visionneuse (ouverture et fermeture).
+struct Fly {
+    tex: TextureHandle,
+    from: Rect,
+    to: Rect,
+    t0: Instant,
+    closing: bool,
+    fade: bool, // fermeture sans miniature visible : l'image rétrécit en s'effaçant
+    idx: usize,
 }
 
 /// Courbe d'animation : rapide au début, douce à la fin.

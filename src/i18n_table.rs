@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 311] = [
+pub static TABLE: [[&str; 5]; 332] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -144,7 +144,7 @@ pub static TABLE: [[&str; 5]; 311] = [
     ["Laisse un champ vide pour désactiver le raccourci. Les touches F1 à F24, Impr. écran, Pause… peuvent s'utiliser seules ; les autres demandent Ctrl, Alt ou Maj.", "Leave a field empty to disable the shortcut. F1 to F24, Print Screen, Pause… can be used alone; other keys need Ctrl, Alt or Shift.", "Deja un campo vacío para desactivar el atajo. F1 a F24, Impr Pant, Pausa… pueden usarse solas; las demás necesitan Ctrl, Alt o Mayús.", "Lass ein Feld leer, um das Kürzel zu deaktivieren. F1 bis F24, Druck, Pause… funktionieren allein; andere Tasten brauchen Strg, Alt oder Umschalt.", "留空即可停用该快捷键。F1 至 F24、Print Screen、Pause 等可单独使用；其他按键需要配合 Ctrl、Alt 或 Shift。"],
     ["Dans la galerie", "In the gallery", "En la galería", "In der Galerie", "在图库中"],
     ["Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer", "Click: open  ·  Ctrl+click: select  ·  right-click: menu  ·  drag images onto it: import them", "Clic: abrir  ·  Ctrl+clic: seleccionar  ·  clic derecho: menú  ·  arrastrar imágenes encima: importarlas", "Klick: öffnen  ·  Strg+Klick: auswählen  ·  Rechtsklick: Menü  ·  Bilder hineinziehen: importieren", "单击：打开  ·  Ctrl+单击：选择  ·  右键：菜单  ·  拖入图片：导入"],
-    ["Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral", "Ctrl+A: select all  ·  Del: Recycle Bin  ·  Esc: deselect  ·  Ctrl+B: side menu", "Ctrl+A: seleccionar todo  ·  Supr: papelera  ·  Esc: deseleccionar  ·  Ctrl+B: menú lateral", "Strg+A: alles auswählen  ·  Entf: Papierkorb  ·  Esc: Auswahl aufheben  ·  Strg+B: Seitenmenü", "Ctrl+A：全选  ·  Del：回收站  ·  Esc：取消选择  ·  Ctrl+B：侧边菜单"],
+    ["Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral  ·  Ctrl+K : palette de commandes", "Ctrl+A: select all  ·  Del: Recycle Bin  ·  Esc: deselect  ·  Ctrl+B: side menu  ·  Ctrl+K: command palette", "Ctrl+A: seleccionar todo  ·  Supr: papelera  ·  Esc: deseleccionar  ·  Ctrl+B: menú lateral  ·  Ctrl+K: paleta de comandos", "Strg+A: alles auswählen  ·  Entf: Papierkorb  ·  Esc: Auswahl aufheben  ·  Strg+B: Seitenmenü  ·  Strg+K: Befehlspalette", "Ctrl+A：全选  ·  Del：回收站  ·  Esc：取消选择  ·  Ctrl+B：侧边菜单  ·  Ctrl+K：命令面板"],
     ["Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom", "Viewer: ← → browse  ·  F favorite  ·  Space slideshow  ·  F11 full screen  ·  wheel zoom", "Visor: ← → navegar  ·  F favorito  ·  Espacio presentación  ·  F11 pantalla completa  ·  rueda zoom", "Bildbetrachter: ← → blättern  ·  F Favorit  ·  Leertaste Diashow  ·  F11 Vollbild  ·  Mausrad Zoom", "查看器：← → 浏览  ·  F 收藏  ·  空格 幻灯片  ·  F11 全屏  ·  滚轮 缩放"],
     ["Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer", "Pinned screenshot: drag to move  ·  wheel to resize  ·  right-click or Esc to close", "Captura fijada: arrastra para mover  ·  rueda para el tamaño  ·  clic derecho o Esc para cerrar", "Angeheftete Aufnahme: ziehen zum Verschieben  ·  Mausrad für die Größe  ·  Rechtsklick oder Esc zum Schließen", "固定的截图：拖动以移动  ·  滚轮调整大小  ·  右键或 Esc 关闭"],
     ["Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu", "Tray icon: left-click = gallery  ·  middle-click = capture  ·  right-click = menu", "Icono de la bandeja: clic izquierdo = galería  ·  clic central = captura  ·  clic derecho = menú", "Infobereich-Symbol: Linksklick = Galerie  ·  Mittelklick = Aufnahme  ·  Rechtsklick = Menü", "托盘图标：左键 = 图库  ·  中键 = 截图  ·  右键 = 菜单"],
@@ -314,4 +314,25 @@ pub static TABLE: [[&str; 5]; 311] = [
     ["Auto|accent", "Auto", "Auto", "Auto", "自动"],
     ["Couleur du thème : l'accent suit le thème choisi", "Theme color: the accent follows the chosen theme", "Color del tema: el acento sigue el tema elegido", "Themenfarbe: Der Akzent folgt dem gewählten Thema", "主题颜色：强调色随所选主题变化"],
     ["{0} capture(s) mise(s) à la corbeille", "{0} screenshot(s) moved to the Recycle Bin", "{0} captura(s) movida(s) a la papelera", "{0} Aufnahme(n) in den Papierkorb verschoben", "已将 {0} 张截图移到回收站"],
+    ["Afficher / réduire le menu", "Show / collapse the menu", "Mostrar / contraer el menú", "Menü ein-/ausklappen", "显示 / 收起菜单"],
+    ["Afficher seulement les favoris", "Show favorites only", "Mostrar solo favoritos", "Nur Favoriten anzeigen", "仅显示收藏"],
+    ["Afficher toutes les captures", "Show all screenshots", "Mostrar todas las capturas", "Alle Aufnahmen anzeigen", "显示所有截图"],
+    ["Aller à", "Go to", "Ir a", "Gehe zu", "转到"],
+    ["Appuie sur {0} pour capturer l'écran, ou {1} pour une zone : tes captures apparaîtront ici.", "Press {0} to capture the screen, or {1} for a region: your screenshots will appear here.", "Pulsa {0} para capturar la pantalla, o {1} para una zona: tus capturas aparecerán aquí.", "Drücke {0} für den Bildschirm oder {1} für einen Bereich: Deine Aufnahmen erscheinen hier.", "按 {0} 截取全屏，或按 {1} 截取区域：截图会显示在这里。"],
+    ["Aucun favori", "No favorites", "Ningún favorito", "Keine Favoriten", "没有收藏"],
+    ["Aucun résultat pour « {0} »", "No results for “{0}”", "Sin resultados para «{0}»", "Keine Ergebnisse für „{0}“", "没有与“{0}”匹配的结果"],
+    ["Aucune capture pour l'instant", "No screenshots yet", "Aún no hay capturas", "Noch keine Aufnahmen", "还没有截图"],
+    ["Aucune commande ne correspond.", "No matching command.", "Ningún comando coincide.", "Kein passender Befehl.", "没有匹配的命令。"],
+    ["Ce dossier est vide", "This folder is empty", "Esta carpeta está vacía", "Dieser Ordner ist leer", "此文件夹为空"],
+    ["Dossier", "Folder", "Carpeta", "Ordner", "文件夹"],
+    ["Effacer la recherche", "Clear search", "Borrar la búsqueda", "Suche löschen", "清除搜索"],
+    ["Essaie un autre mot, ou cherche par date (par exemple 2026-11).", "Try another word, or search by date (for example 2026-11).", "Prueba otra palabra o busca por fecha (por ejemplo 2026-11).", "Versuche ein anderes Wort oder suche nach Datum (zum Beispiel 2026-11).", "换个关键词，或按日期搜索（例如 2026-11）。"],
+    ["Palette de commandes (Ctrl+K)", "Command palette (Ctrl+K)", "Paleta de comandos (Ctrl+K)", "Befehlspalette (Strg+K)", "命令面板（Ctrl+K）"],
+    ["Survole une capture et clique sur l'étoile, ou appuie sur F dans la visionneuse.", "Hover a screenshot and click the star, or press F in the viewer.", "Pasa el ratón por una captura y haz clic en la estrella, o pulsa F en el visor.", "Fahre über eine Aufnahme und klicke auf den Stern, oder drücke F in der Ansicht.", "将鼠标悬停在截图上并点击星标，或在查看器中按 F。"],
+    ["Tape une commande, un thème, un dossier ou une capture…", "Type a command, a theme, a folder or a screenshot…", "Escribe un comando, un tema, una carpeta o una captura…", "Befehl, Thema, Ordner oder Aufnahme eingeben…", "输入命令、主题、文件夹或截图…"],
+    ["Trier", "Sort", "Ordenar", "Sortieren", "排序"],
+    ["choisir", "choose", "elegir", "auswählen", "选择"],
+    ["fermer", "close", "cerrar", "schließen", "关闭"],
+    ["valider", "confirm", "confirmar", "bestätigen", "确认"],
+    ["Échap", "Esc", "Esc", "Esc", "Esc"],
 ];
