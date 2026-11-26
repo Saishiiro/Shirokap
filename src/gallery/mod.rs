@@ -89,6 +89,7 @@ struct App {
     favs_only: bool,
     thumb_w: f32,
     thumbs: HashMap<PathBuf, Option<TextureHandle>>,
+    thumb_born: HashMap<PathBuf, Instant>, // moment du chargement de chaque miniature (pour son fondu)
     view: Option<usize>,
     full: Option<(PathBuf, TextureHandle)>,
     zoom: Option<f32>,
@@ -109,6 +110,8 @@ struct App {
     sidebar_open: bool,
     set_cat: SetCat,
     show_welcome: bool,
+    shown_tab: Tab,      // onglet affiché à l'image précédente
+    tab_at: Instant,     // moment du dernier changement d'onglet (pour le fondu)
 }
 
 pub fn run(settings: bool) {
@@ -155,6 +158,7 @@ impl App {
             favs_only: ui_state.favs_only,
             thumb_w: ui_state.thumb_w.clamp(120.0, 420.0),
             thumbs: HashMap::new(),
+            thumb_born: HashMap::new(),
             view: None,
             full: None,
             zoom: None,
@@ -175,6 +179,8 @@ impl App {
             sidebar_open: ui_state.sidebar,
             set_cat: SetCat::Shortcuts,
             show_welcome: !ui_state.welcomed,
+            shown_tab: Tab::Gallery,
+            tab_at: Instant::now() - Duration::from_secs(1),
         }
     }
 
@@ -315,12 +321,22 @@ impl eframe::App for App {
         let toast = self.toast.as_ref().map(|(m, t)| (m.clone(), t.elapsed()));
         match toast {
             Some((_, age)) if age > Duration::from_millis(3200) => self.toast = None,
-            Some((msg, _)) => {
-                ctx.request_repaint_after(Duration::from_millis(200));
+            Some((msg, age)) => {
+                // la notification glisse vers le haut en apparaissant, puis s'efface en fondu
+                let age = age.as_secs_f32();
+                let enter = ease_out((age / 0.22).min(1.0));
+                let leave = ((3.2 - age) / 0.35).clamp(0.0, 1.0);
+                if age < 0.22 || age > 2.85 {
+                    ctx.request_repaint();
+                } else {
+                    ctx.request_repaint_after(Duration::from_secs_f32(2.85 - age));
+                }
                 egui::Area::new(egui::Id::new("toast"))
-                    .anchor(Align2::RIGHT_BOTTOM, vec2(-22.0, -56.0))
+                    .anchor(Align2::RIGHT_BOTTOM, vec2(-22.0, -56.0 + 18.0 * (1.0 - enter)))
                     .order(egui::Order::Foreground)
+                    .interactable(false)
                     .show(ctx, |ui| {
+                        ui.multiply_opacity(enter.min(leave));
                         egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(16.0, 10.0)).show(ui, |ui| {
                             ui.label(msg);
                         });
@@ -479,48 +495,47 @@ impl eframe::App for App {
         let immersive = self.fullscreen && self.view.is_some() && self.editor.is_none() && self.compare.is_none();
         if !immersive {
         let side_fill = palette(&self.cfg.theme).side;
-        if self.sidebar_open {
+        // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
+        let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, 0.22, egui::emath::easing::cubic_in_out);
+        let nav_w = 56.0 + (190.0 - 56.0) * open_k;
+        let wide = nav_w > 150.0;
         egui::SidePanel::left("nav")
-            .exact_width(190.0)
+            .exact_width(nav_w)
             .resizable(false)
-            .frame(egui::Frame::none().fill(side_fill).inner_margin(egui::Margin::same(14.0)))
+            .frame(egui::Frame::none().fill(side_fill).inner_margin(egui::Margin::same(if wide { 14.0 } else { 13.0 })))
             .show(ctx, |ui| {
-                ui.add_space(6.0);
-                ui.horizontal(|ui| {
-                    ui.label(bold_text("Shirokap", 22.0));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if sidebar_icon_button(ui).on_hover_text(tr("Réduire le menu (Ctrl+B)")).clicked() {
-                            self.sidebar_open = false;
+                if wide {
+                    ui.multiply_opacity(((nav_w - 150.0) / 40.0).clamp(0.0, 1.0));
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        ui.label(bold_text("Shirokap", 22.0));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if sidebar_icon_button(ui).on_hover_text(tr("Réduire le menu (Ctrl+B)")).clicked() {
+                                self.sidebar_open = false;
+                            }
+                        });
+                    });
+                    ui.add_space(14.0);
+                    nav_item(ui, &mut self.tab, Tab::Gallery, tr("Galerie"));
+                    nav_item(ui, &mut self.tab, Tab::Stats, tr("Statistiques"));
+                    nav_item(ui, &mut self.tab, Tab::Settings, tr("Paramètres"));
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                        ui.add_space(4.0);
+                        ui.weak(trf("Version {0}", &[&env!("CARGO_PKG_VERSION")]));
+                        ui.add_space(6.0);
+                        let label = if self.fullscreen { tr("Quitter le plein écran") } else { tr("Plein écran") };
+                        if ui.add(egui::Button::new(label).shortcut_text("F11")).clicked() {
+                            self.toggle_fullscreen(ctx);
                         }
                     });
-                });
-                ui.add_space(14.0);
-                nav_item(ui, &mut self.tab, Tab::Gallery, tr("Galerie"));
-                nav_item(ui, &mut self.tab, Tab::Stats, tr("Statistiques"));
-                nav_item(ui, &mut self.tab, Tab::Settings, tr("Paramètres"));
-                ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                    ui.add_space(4.0);
-                    ui.weak(trf("Version {0}", &[&env!("CARGO_PKG_VERSION")]));
-                    ui.add_space(6.0);
-                    let label = if self.fullscreen { tr("Quitter le plein écran") } else { tr("Plein écran") };
-                    if ui.add(egui::Button::new(label).shortcut_text("F11")).clicked() {
-                        self.toggle_fullscreen(ctx);
-                    }
-                });
-            });
-        } else {
-            // menu réduit : une fine colonne avec le seul bouton pour le rouvrir
-            egui::SidePanel::left("nav_rail")
-                .exact_width(56.0)
-                .resizable(false)
-                .frame(egui::Frame::none().fill(side_fill).inner_margin(egui::Margin::same(13.0)))
-                .show(ctx, |ui| {
+                } else {
+                    // menu réduit : une fine colonne avec le seul bouton pour le rouvrir
                     ui.add_space(6.0);
                     if sidebar_icon_button(ui).on_hover_text(tr("Ouvrir le menu (Ctrl+B)")).clicked() {
                         self.sidebar_open = true;
                     }
-                });
-        }
+                }
+            });
 
         match self.tab {
             Tab::Gallery => {
@@ -575,10 +590,28 @@ impl eframe::App for App {
                 .fill(ctx.style().visuals.panel_fill)
                 .inner_margin(egui::Margin::symmetric(22.0, 16.0))
         };
-        egui::CentralPanel::default().frame(content).show(ctx, |ui| match self.tab {
+        // changement d'onglet : le contenu apparaît en fondu en remontant légèrement
+        if self.tab != self.shown_tab {
+            self.shown_tab = self.tab;
+            self.tab_at = Instant::now();
+        }
+        let tab_k = ease_out((self.tab_at.elapsed().as_secs_f32() / 0.2).min(1.0));
+        if tab_k < 1.0 {
+            ctx.request_repaint();
+        }
+        egui::CentralPanel::default().frame(content).show(ctx, |ui| {
+            ui.multiply_opacity(tab_k);
+            ui.add_space(8.0 * (1.0 - tab_k));
+            match self.tab {
             Tab::Gallery => self.gallery_ui(ui),
             Tab::Settings => self.settings_ui(ui),
             Tab::Stats => self.stats_ui(ui),
+            }
         });
     }
+}
+
+/// Courbe d'animation : rapide au début, douce à la fin.
+pub(crate) fn ease_out(t: f32) -> f32 {
+    1.0 - (1.0 - t).powi(3)
 }

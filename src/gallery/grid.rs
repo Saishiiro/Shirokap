@@ -196,6 +196,7 @@ impl App {
                             loads += 1;
                             let t = load_thumb(&ctx, &path);
                             self.thumbs.insert(path.clone(), t);
+                            self.thumb_born.insert(path.clone(), Instant::now());
                         }
                         let fav = self.favs.contains(&path);
                         let picked = self.sel.contains(&path);
@@ -209,13 +210,35 @@ impl App {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
 
+                        // --- animations : la carte se soulève au survol, la miniature apparaît en fondu ---
+                        let id = ui.id();
+                        let lift = ctx.animate_bool_with_time_and_easing(id.with(("lift", i)), hov, 0.16, egui::emath::easing::cubic_out);
+                        let show_btns = ctx.animate_bool_with_time(id.with(("btns", i)), hov, 0.12);
+                        let show_pick = ctx.animate_bool_with_time(id.with(("pickv", i)), hov || selecting, 0.12);
+                        let check = ctx.animate_bool_with_time_and_easing(id.with(("check", i)), picked, 0.16, egui::emath::easing::back_out);
+                        let fade = self.thumb_born.get(&path).map(|t| ease_out((t.elapsed().as_secs_f32() / 0.25).min(1.0))).unwrap_or(1.0);
+                        if fade < 1.0 {
+                            ctx.request_repaint();
+                        }
+                        let rect = rect.translate(vec2(0.0, -3.0 * lift)).expand(1.5 * lift);
+
                         // --- miniature arrondie + bandeau d'info ---
-                        let rnd = 8.0_f32;
+                        let rnd = 10.0_f32;
                         let p = ui.painter();
+                        if lift > 0.01 {
+                            let sh = egui::epaint::Shadow {
+                                offset: vec2(0.0, 8.0 * lift),
+                                blur: 22.0 * lift,
+                                spread: 0.0,
+                                color: Color32::from_black_alpha((110.0 * lift) as u8),
+                            };
+                            p.add(sh.as_shape(rect, rnd));
+                        }
                         p.rect_filled(rect, rnd, ui.visuals().faint_bg_color);
                         if let Some(Some(t)) = self.thumbs.get(&path) {
                             egui::Image::new(egui::load::SizedTexture::new(t.id(), rect.size()))
                                 .rounding(rnd)
+                                .tint(Color32::from_white_alpha((fade * 255.0) as u8))
                                 .paint_at(ui, rect);
                         }
                         let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 24.0), rect.max);
@@ -230,8 +253,8 @@ impl App {
                         p.galley(pos2(bar.min.x + 10.0, bar.center().y - galley.size().y / 2.0), galley, Color32::WHITE);
                         if picked {
                             p.rect_stroke(rect, rnd, Stroke::new(3.0_f32, acc));
-                        } else if hov {
-                            p.rect_stroke(rect, rnd, Stroke::new(2.0_f32, acc));
+                        } else if lift > 0.01 {
+                            p.rect_stroke(rect, rnd, Stroke::new(2.0_f32, acc.gamma_multiply(lift)));
                         }
 
                         // --- boutons rapides au survol ---
@@ -242,22 +265,28 @@ impl App {
                         let r_fav = r_copy.translate(vec2(-(bs + 6.0), 0.0));
                         let r_pick = Rect::from_min_size(rect.min + vec2(8.0, 8.0), vec2(bs, bs));
                         let mut hit = false;
-                        let id = ui.id();
-                        if hov || selecting {
+                        // cercle de sélection : apparaît en fondu, la coche « rebondit » quand on sélectionne
+                        if show_pick > 0.01 {
+                            let mut pp = p.clone();
+                            pp.multiply_opacity(show_pick);
                             let rp = ui.interact(r_pick, id.with(("pick", i)), Sense::click());
                             if rp.clicked() {
                                 acts.push(Act::Pick(path.clone()));
                                 hit = true;
                             }
-                            if picked {
-                                p.circle_filled(r_pick.center(), 13.0, acc);
-                                icon_check(p, r_pick.center(), on_accent(acc));
-                            } else {
-                                p.circle_filled(r_pick.center(), 13.0, Color32::from_black_alpha(if rp.hovered() { 200 } else { 120 }));
-                                p.circle_stroke(r_pick.center(), 13.0, Stroke::new(1.5_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 190)));
+                            pp.circle_filled(r_pick.center(), 13.0, Color32::from_black_alpha(if rp.hovered() { 200 } else { 120 }));
+                            pp.circle_stroke(r_pick.center(), 13.0, Stroke::new(1.5_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 190)));
+                            if check > 0.01 {
+                                pp.circle_filled(r_pick.center(), 13.0 * check.min(1.15), acc);
+                                if check > 0.5 {
+                                    icon_check(&pp, r_pick.center(), on_accent(acc));
+                                }
                             }
                         }
-                        if hov {
+                        let mut bp = p.clone();
+                        bp.multiply_opacity(show_btns);
+                        let p = &bp; // les boutons rapides suivent le fondu du survol
+                        if show_btns > 0.01 {
                             let rt = ui.interact(r_trash, id.with(("trash", i)), Sense::click()).on_hover_text(tr("Mettre à la corbeille"));
                             let rc = ui.interact(r_copy, id.with(("copy", i)), Sense::click()).on_hover_text(tr("Copier l'image"));
                             let rf = ui.interact(r_fav, id.with(("fav", i)), Sense::click()).on_hover_text(tr("Favori"));
@@ -285,8 +314,11 @@ impl App {
                                 FontId::proportional(16.0),
                                 if fav { Color32::GOLD } else { Color32::WHITE },
                             );
-                        } else if fav {
-                            p.text(rect.right_top() + vec2(-10.0, 8.0), Align2::RIGHT_TOP, "★", FontId::proportional(20.0), Color32::GOLD);
+                        }
+                        if fav && show_btns < 0.99 {
+                            let mut fp = ui.painter().clone();
+                            fp.multiply_opacity(1.0 - show_btns);
+                            fp.text(rect.right_top() + vec2(-10.0, 8.0), Align2::RIGHT_TOP, "★", FontId::proportional(20.0), Color32::GOLD);
                         }
 
                         resp.context_menu(|ui| {
