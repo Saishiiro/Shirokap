@@ -883,6 +883,8 @@ impl Editor {
                 Tool::Pen | Tool::Eraser | Tool::Step | Tool::Text => egui::CursorIcon::None,
                 _ => egui::CursorIcon::Crosshair,
             });
+            // l'aperçu du pinceau suit la souris : on garde la pleine fréquence d'images pour qu'il ne traîne pas
+            mark_animating();
             if let Some(pos) = resp.hover_pos() {
                 if let Some(r) = brush {
                     let rr = (r * scale).max(2.0);

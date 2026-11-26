@@ -55,7 +55,7 @@ impl App {
                 for (row_i, (label, n)) in counts.into_iter().enumerate() {
                     let grow = ease_out(((since - 0.12 - row_i as f32 * 0.07) / 0.7).clamp(0.0, 1.0));
                     if grow < 1.0 {
-                        ui.ctx().request_repaint();
+                        ui.ctx().anim_repaint();
                     }
                     let (row, _) = ui.allocate_exact_size(vec2(480.0, 22.0), Sense::hover());
                     let txt = ui.visuals().text_color();
@@ -374,7 +374,7 @@ impl App {
             // ouverture sans miniature : l'image grandit en fondu ; précédente / suivante : elle glisse depuis le côté
             let k = ease_out((self.view_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
             if k < 1.0 {
-                ctx.request_repaint();
+                ctx.anim_repaint();
             }
             let dir = self.view_dir;
             let grow = if dir == 0.0 { 0.9 + 0.1 * k } else { 1.0 };

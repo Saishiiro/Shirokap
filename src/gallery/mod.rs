@@ -400,7 +400,7 @@ impl eframe::App for App {
 
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        frame_cap(); // au plus 60 images par seconde
+        frame_cap(ctx); // fluide quand ça bouge, économe sinon
 
         // F11 : plein écran depuis n'importe quel écran ; Échap en sort (hors visionneuse, qui gère son propre Échap)
         if ctx.input(|i| i.key_pressed(Key::F11)) {
@@ -431,7 +431,7 @@ impl eframe::App for App {
                 let enter = ease_out((age / anim::ENTER).min(1.0));
                 let leave = ((3.2 - age) / 0.45).clamp(0.0, 1.0);
                 if age < anim::ENTER || age > 2.75 {
-                    ctx.request_repaint();
+                    ctx.anim_repaint();
                 } else {
                     ctx.request_repaint_after(Duration::from_secs_f32(2.75 - age));
                 }
@@ -580,7 +580,7 @@ impl eframe::App for App {
             }
         }
         if let Some(idx) = self.recording {
-            ctx.request_repaint(); // on lit le clavier en continu pendant l'enregistrement
+            ctx.anim_repaint(); // on lit le clavier en continu pendant l'enregistrement
             match poll_hotkey() {
                 Poll::Wait => {}
                 Poll::Cancel => self.recording = None,
@@ -620,7 +620,7 @@ impl eframe::App for App {
                 self.reveal = None;
                 self.reveal_req = Some((origin, Instant::now()));
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot);
-                ctx.request_repaint();
+                ctx.anim_repaint();
             } else {
                 self.theme_anim = Some((self.shown_pal, self.shown_acc, Instant::now()));
                 self.applied = cur;
@@ -648,7 +648,7 @@ impl eframe::App for App {
                 self.applied = (self.cfg.theme.clone(), self.cfg.accent_rgb());
                 self.reveal_req = None;
             }
-            ctx.request_repaint();
+            ctx.anim_repaint();
         }
         if let Some((from_pal, from_acc, t0)) = self.theme_anim {
             let t = egui::emath::easing::cubic_in_out((t0.elapsed().as_secs_f32() / anim::THEME).min(1.0));
@@ -658,7 +658,7 @@ impl eframe::App for App {
             if t >= 1.0 {
                 self.theme_anim = None;
             } else {
-                ctx.request_repaint();
+                ctx.anim_repaint();
             }
         }
         // barre de titre de Windows : claire ou sombre, et de la couleur du fond du thème (Windows 11)
@@ -678,7 +678,7 @@ impl eframe::App for App {
         if !immersive {
         let side_fill = self.shown_pal.side;
         // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
-        let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
+        let open_k = ctx.anim_be(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
         let nav_w = 56.0 + (190.0 - 56.0) * open_k;
         let wide = nav_w > 150.0;
         egui::SidePanel::left("nav")
@@ -846,7 +846,7 @@ impl eframe::App for App {
         }
         let tab_k = ease_out((self.tab_at.elapsed().as_secs_f32() / anim::PAGE).min(1.0));
         if tab_k < 1.0 {
-            ctx.request_repaint();
+            ctx.anim_repaint();
         }
         egui::CentralPanel::default().frame(content).show(ctx, |ui| {
             ui.multiply_opacity(tab_k);
@@ -877,7 +877,7 @@ impl eframe::App for App {
             if t >= 1.0 {
                 self.fly = None;
             } else {
-                ctx.request_repaint();
+                ctx.anim_repaint();
             }
         }
         self.palette_ui(ctx);
@@ -901,7 +901,7 @@ impl eframe::App for App {
             if t >= 1.0 {
                 self.reveal = None; // la capture est libérée
             } else {
-                ctx.request_repaint();
+                ctx.anim_repaint();
             }
         }
     }

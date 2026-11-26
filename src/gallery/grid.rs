@@ -56,7 +56,7 @@ impl App {
             if del && !self.sel.is_empty() {
                 let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
                 self.trash(v);
-                ctx.request_repaint();
+                ctx.anim_repaint();
                 return;
             }
         }
@@ -141,7 +141,7 @@ impl App {
         if !self.sel.is_empty() {
             self.sel_shown = self.sel.len();
         }
-        let sel_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("selbar"), !self.sel.is_empty(), anim::PAGE, egui::emath::easing::cubic_out);
+        let sel_k = ctx.anim_be(egui::Id::new("selbar"), !self.sel.is_empty(), anim::PAGE, egui::emath::easing::cubic_out);
         if sel_k > 0.01 {
             let h = 46.0;
             let (slot, _) = ui.allocate_exact_size(vec2(ui.available_width(), h * sel_k), Sense::hover());
@@ -241,11 +241,11 @@ impl App {
 
                         // --- animations : la carte se soulève au survol, la miniature apparaît en fondu ---
                         let id = ui.id();
-                        let lift = ctx.animate_bool_with_time_and_easing(id.with(("lift", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
-                        let show_btns = ctx.animate_bool_with_time_and_easing(id.with(("btns", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
-                        let show_pick = ctx.animate_bool_with_time_and_easing(id.with(("pickv", i)), hov || selecting, anim::HOVER, egui::emath::easing::cubic_out);
-                        let check = ctx.animate_bool_with_time_and_easing(id.with(("check", i)), picked, 0.3, egui::emath::easing::back_out);
-                        let fav_k = ctx.animate_bool_with_time_and_easing(id.with(("favk", i)), fav, 0.35, egui::emath::easing::back_out);
+                        let lift = ctx.anim_be(id.with(("lift", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
+                        let show_btns = ctx.anim_be(id.with(("btns", i)), hov, anim::HOVER, egui::emath::easing::cubic_out);
+                        let show_pick = ctx.anim_be(id.with(("pickv", i)), hov || selecting, anim::HOVER, egui::emath::easing::cubic_out);
+                        let check = ctx.anim_be(id.with(("check", i)), picked, 0.3, egui::emath::easing::back_out);
+                        let fav_k = ctx.anim_be(id.with(("favk", i)), fav, 0.35, egui::emath::easing::back_out);
                         let fav_pop = 1.0 + 0.45 * (1.0 - (2.0 * fav_k - 1.0).abs()).max(0.0); // l'étoile grossit puis revient
                         let fade = self.thumb_born.get(&path).map(|t| ease_out((t.elapsed().as_secs_f32() / anim::ENTER).min(1.0))).unwrap_or(1.0);
                         // apparition en cascade : chaque carte arrive un peu après la précédente, en montant
@@ -253,7 +253,7 @@ impl App {
                         order += 1;
                         let ent = ease_out(((since_grid - delay) / anim::ENTER).clamp(0.0, 1.0));
                         if fade < 1.0 || ent < 1.0 {
-                            ctx.request_repaint();
+                            ctx.anim_repaint();
                         }
                         let op0 = ui.opacity();
                         ui.multiply_opacity(ent);
@@ -289,7 +289,7 @@ impl App {
                             // pas encore chargée : reflet qui balaie la carte en attendant
                             None => {
                                 shimmer(p, rect, now + i as f32 * 0.07, ui.visuals().dark_mode);
-                                ctx.request_repaint();
+                                ctx.anim_repaint();
                             }
                         }
                         let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 24.0), rect.max);
@@ -426,7 +426,7 @@ impl App {
             ui.add_space(12.0);
         });
         if loads > 0 {
-            ctx.request_repaint();
+            ctx.anim_repaint();
         }
         for a in acts {
             match a {
@@ -551,7 +551,7 @@ impl App {
         // apparition : l'illustration monte en fondu
         let k = ease_out((self.grid_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
         if k < 1.0 {
-            ui.ctx().request_repaint();
+            ui.ctx().anim_repaint();
         }
         let acc = self.shown_acc;
         let mut clicked = false;

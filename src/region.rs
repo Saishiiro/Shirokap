@@ -103,7 +103,6 @@ impl Region {
 
 impl eframe::App for Region {
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        crate::common::frame_cap(); // au plus 60 images par seconde
         if !self.placed {
             self.placed = true;
             place_window(self.origin.0, self.origin.1, self.img.width() as i32, self.img.height() as i32);

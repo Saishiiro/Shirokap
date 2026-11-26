@@ -305,7 +305,7 @@ impl eframe::App for Popup {
     }
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        crate::common::frame_cap(); // au plus 60 images par seconde
+        crate::common::frame_cap(ctx); // fluide quand ça bouge, économe sinon
         if !self.placed {
             self.placed = true;
             self.place(ctx);

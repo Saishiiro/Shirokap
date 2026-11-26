@@ -29,7 +29,7 @@ impl App {
         }
         let k = ease_out((self.cat_at.elapsed().as_secs_f32() / anim::PAGE).min(1.0));
         if k < 1.0 {
-            ui.ctx().request_repaint();
+            ui.ctx().anim_repaint();
         }
         let pad = egui::Margin { left: 18.0 + 28.0 * (1.0 - k), right: 0.0, top: 0.0, bottom: 0.0 };
         egui::Frame::none().inner_margin(pad).show(ui, |ui| {
@@ -250,7 +250,7 @@ impl App {
         let since = self.tab_at.elapsed().min(self.cat_at.elapsed()).as_secs_f32();
         let appear = |n: usize| ease_out(((since - 0.1 - n as f32 * 0.035) / 0.45).clamp(0.0, 1.0));
         if appear(THEMES.len() + ACCENTS.len() + 1) < 1.0 {
-            ui.ctx().request_repaint();
+            ui.ctx().anim_repaint();
         }
         card(ui, tr("Thème"), |ui| {
             setting(ui, tr("Thème"), tr("Choisis l'ambiance de l'interface : le changement est immédiat."), |ui| {
@@ -285,8 +285,8 @@ impl App {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
                         let on = self.cfg.accent_auto;
-                        let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::cubic_out);
-                        let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), on, 0.4, egui::emath::easing::back_out);
+                        let hk = ctx.anim_be(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::cubic_out);
+                        let sk = ctx.anim_be(resp.id.with("sel"), on, 0.4, egui::emath::easing::back_out);
                         let k = appear(THEMES.len());
                         let mut p = ui.painter().clone();
                         p.multiply_opacity(k);
@@ -314,13 +314,13 @@ impl App {
                         p.circle_stroke(c, 5.0, Stroke::new(1.5_f32, v.widgets.inactive.bg_fill));
                         p.text(pos2(c.x + 14.0, r.center().y), Align2::LEFT_CENTER, tr("Auto|accent"), FontId::new(14.0, egui::FontFamily::Name("bold".into())), txt);
                         if resp.hovered() {
-                            ctx.request_repaint();
+                            ctx.anim_repaint();
                         }
                         if let Some((rn, t0)) = ripple {
                             let e = ((now - t0) as f32 / 0.6).clamp(0.0, 1.0);
                             if rn == usize::MAX && e < 1.0 {
                                 p.rect_stroke(r.expand(10.0 * ease_out(e)), 14.0 + 10.0 * e, Stroke::new(2.5 * (1.0 - e), tcol));
-                                ctx.request_repaint();
+                                ctx.anim_repaint();
                             }
                         }
                         if resp.clicked() {
@@ -336,8 +336,8 @@ impl App {
                         }
                         let chosen = !self.cfg.accent_auto && self.cfg.accent == *c;
                         // survol : la pastille grossit ; choix : l'anneau se referme autour en rebondissant
-                        let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::back_out);
-                        let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), chosen, 0.4, egui::emath::easing::back_out);
+                        let hk = ctx.anim_be(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::back_out);
+                        let sk = ctx.anim_be(resp.id.with("sel"), chosen, 0.4, egui::emath::easing::back_out);
                         let k = appear(THEMES.len() + 1 + n);
                         let ring = ui.visuals().text_color();
                         let color = col(c[0], c[1], c[2]);
@@ -355,7 +355,7 @@ impl App {
                             let e = ((now - t0) as f32 / 0.6).clamp(0.0, 1.0);
                             if rn == n && e < 1.0 {
                                 p.circle_stroke(center, 13.0 + 16.0 * ease_out(e), Stroke::new(2.5 * (1.0 - e), color));
-                                ctx.request_repaint();
+                                ctx.anim_repaint();
                             }
                         }
                         if resp.clicked() {

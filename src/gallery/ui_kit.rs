@@ -150,8 +150,8 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     let ctx = ui.ctx().clone();
-    let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), super::anim::HOVER, egui::emath::easing::cubic_out);
-    let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), selected, 0.45, egui::emath::easing::back_out);
+    let hk = ctx.anim_be(resp.id.with("hov"), resp.hovered(), super::anim::HOVER, egui::emath::easing::cubic_out);
+    let sk = ctx.anim_be(resp.id.with("sel"), selected, 0.45, egui::emath::easing::back_out);
     // onde au clic, qui part du point cliqué
     let rip_id = resp.id.with("ripple");
     let now = ctx.input(|i| i.time);
@@ -193,7 +193,7 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
         if e < 1.0 {
             let r = ease_out(e) * rect.width() * 1.15;
             p.with_clip_rect(rect.intersect(p.clip_rect())).circle_filled(pos, r, acc.gamma_multiply(0.35 * (1.0 - e)));
-            ctx.request_repaint();
+            ctx.anim_repaint();
         }
     }
     // contour : il prend la couleur d'accent et s'épaissit quand la carte devient le thème actif
@@ -309,8 +309,8 @@ pub(crate) fn icon_button(ui: &mut egui::Ui, icon: &str, on: bool) -> egui::Resp
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
-    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("on"), on, super::anim::PAGE, egui::emath::easing::cubic_out);
+    let hk = ui.ctx().anim_b(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().anim_be(resp.id.with("on"), on, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
     let acc = v.selection.bg_fill;
     let p = ui.painter();
@@ -333,7 +333,7 @@ pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
     }
     let hover = ui.visuals().widgets.hovered.weak_bg_fill;
     let color = ui.visuals().text_color();
-    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let hk = ui.ctx().anim_b(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let p = ui.painter();
     if hk > 0.01 {
         p.rect_filled(rect, 8.0, hover.gamma_multiply(hk));
@@ -350,8 +350,8 @@ pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab:
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     // survol en fondu ; l'entrée active se teinte, son liseré grandit et le texte se décale un peu
-    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
-    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
+    let hk = ui.ctx().anim_b(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().anim_be(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
     let acc = v.selection.bg_fill;
     let hover = v.widgets.hovered.weak_bg_fill;
