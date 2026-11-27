@@ -43,7 +43,7 @@ impl App {
         }
 
         self.slideshow = false;
-        if !ctx.wants_keyboard_input() {
+        if !ctx.wants_keyboard_input() && self.confirm_trash.is_none() {
             let (all, del, esc) = ctx.input(|i| {
                 (i.modifiers.command && i.key_pressed(Key::A), i.key_pressed(Key::Delete), i.key_pressed(Key::Escape))
             });
@@ -54,10 +54,8 @@ impl App {
                 self.sel.clear();
             }
             if del && !self.sel.is_empty() {
-                let v: Vec<PathBuf> = self.sel.iter().cloned().collect();
-                self.trash(v);
+                self.confirm_trash = Some(self.sel.iter().cloned().collect());
                 ctx.request_repaint();
-                return;
             }
         }
 
@@ -236,7 +234,7 @@ impl App {
                                     }
                                 }
                                 if btn(ui, icons::TRASH, tr("Corbeille")).clicked() {
-                                    acts.push(Act::Trash(self.sel.iter().cloned().collect()));
+                                    acts.push(Act::AskTrash(self.sel.iter().cloned().collect()));
                                 }
                                 if btn(ui, icons::CLOSE, tr("Désélectionner")).clicked() {
                                     self.sel.clear();
@@ -522,6 +520,7 @@ impl App {
                     let _ = Command::new("explorer").arg("/select,").arg(&p).spawn();
                 }
                 Act::Trash(v) => self.trash(v),
+                Act::AskTrash(v) => self.confirm_trash = Some(v),
                 Act::Path(p) => {
                     copy_text(&p.display().to_string());
                     self.status = ic(icons::LINK, tr("Chemin copié"));

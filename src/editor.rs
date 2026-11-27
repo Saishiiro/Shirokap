@@ -846,38 +846,15 @@ impl Editor {
         }
 
         if self.confirm {
-            let (mut yes, mut no) = (false, false);
-            egui::Window::new(tr("Remplacer l'original ?"))
-                .collapsible(false)
-                .resizable(false)
-                .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
-                .show(ui.ctx(), |ui| {
-                    ui.label(tr("L'image d'origine sera écrasée par la version annotée."));
-                    ui.label(tr("C'est définitif. Pour garder l'original, utilise plutôt « Enregistrer »."));
-                    ui.add_space(6.0);
-                    ui.horizontal(|ui| {
-                        let danger = egui::Button::new(egui::RichText::new(format!("{}  {}", icons::REPLACE, tr("Remplacer"))).color(Color32::WHITE))
-                            .fill(Color32::from_rgb(220, 60, 60))
-                            .stroke(Stroke::NONE)
-                            .rounding(18.0)
-                            .min_size(vec2(0.0, 36.0));
-                        if ui.add(danger).clicked() {
-                            yes = true;
-                        }
-                        if crate::gallery::form::ghost(ui, "", tr("Annuler")).clicked() {
-                            no = true;
-                        }
-                    });
-                });
-            if ui.input(|i| i.key_pressed(Key::Escape)) {
-                no = true;
-            }
-            if yes {
-                self.confirm = false;
-                save = Some(true);
-            }
-            if no {
-                self.confirm = false;
+            // définitif : pas de validation à la touche Entrée, il faut cliquer sur le bouton rouge
+            let lines = [tr("L'image d'origine sera écrasée par la version annotée."), tr("C'est définitif. Pour garder l'original, utilise plutôt « Enregistrer ».")];
+            match crate::gallery::ui_kit::confirm_dialog(ui.ctx(), "replace", icons::REPLACE, tr("Remplacer l'original ?"), &lines, tr("Remplacer"), false) {
+                Some(true) => {
+                    self.confirm = false;
+                    save = Some(true);
+                }
+                Some(false) => self.confirm = false,
+                None => {}
             }
         }
 

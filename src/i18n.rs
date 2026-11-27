@@ -148,6 +148,17 @@ pub fn decimal_comma() -> bool {
     matches!(lang(), FR | ES | DE)
 }
 
+/// Bouton « Annuler » des notifications (défaire l'action) : en anglais « Undo », pas « Cancel ».
+pub fn undo_label() -> &'static str {
+    match lang() {
+        EN => "Undo",
+        ES => "Deshacer",
+        DE => "Rückgängig",
+        ZH => "撤销",
+        _ => "Annuler",
+    }
+}
+
 /// « N dossiers ».
 pub fn n_folders(n: usize) -> String {
     match lang() {

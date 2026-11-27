@@ -68,6 +68,7 @@ enum Act {
     Copy(PathBuf),
     Reveal(PathBuf),
     Trash(Vec<PathBuf>),
+    AskTrash(Vec<PathBuf>), // corbeille de la sélection : on demande d'abord confirmation
     Path(PathBuf),
     Edit(PathBuf),
     Pin(PathBuf),
@@ -138,6 +139,7 @@ struct App {
     toast: Option<(String, Instant, Option<Undo>)>,
     undo_next: Option<Undo>, // action annulable liée au prochain message (bouton « Annuler » de la notification)
     rename_dlg: Option<(PathBuf, String)>,
+    confirm_trash: Option<Vec<PathBuf>>, // captures sélectionnées à mettre à la corbeille, en attente de confirmation
     sidebar_open: bool,
     set_cat: SetCat,
     show_welcome: bool,
@@ -246,6 +248,7 @@ impl App {
             toast: None,
             undo_next: None,
             rename_dlg: None,
+            confirm_trash: None,
             sidebar_open: ui_state.sidebar,
             set_cat: SetCat::Shortcuts,
             show_welcome: !ui_state.welcomed,
@@ -624,7 +627,7 @@ impl eframe::App for App {
                             }
                             if has_undo {
                                 ui.add_space(10.0);
-                                if pill(ui, icons::UNDO, tr("Annuler")).on_hover_text(tr("Annule cette action")).clicked() {
+                                if pill(ui, icons::UNDO, undo_label()).on_hover_text(tr("Annule cette action")).clicked() {
                                     undo_clicked = true;
                                 }
                             }
@@ -676,6 +679,20 @@ impl eframe::App for App {
         if let Some((p, n)) = do_rename {
             self.rename_dlg = None;
             self.rename_file(&p, &n);
+        }
+        // corbeille de la sélection : on demande confirmation (Entrée confirme, Échap annule)
+        if let Some(list) = &self.confirm_trash {
+            let n = list.len();
+            let what = trf("{0} capture(s) sélectionnée(s) vont partir dans la corbeille.", &[&n]);
+            let lines = [what.as_str(), tr("Tu pourras les récupérer depuis la corbeille de Windows, ou avec « Annuler » dans la notification.")];
+            match confirm_dialog(ctx, "trash", icons::TRASH, tr("Mettre à la corbeille ?"), &lines, tr("Mettre à la corbeille"), true) {
+                Some(true) => {
+                    let v = self.confirm_trash.take().unwrap_or_default();
+                    self.trash(v);
+                }
+                Some(false) => self.confirm_trash = None,
+                None => {}
+            }
         }
         // écran d'accueil (au premier lancement, ou via Paramètres > Système)
         self.welcome_ui(ctx);

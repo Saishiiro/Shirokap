@@ -544,6 +544,75 @@ pub(crate) fn pill_button(ui: &mut egui::Ui, icon: &str, label: &str, key: &str)
     resp
 }
 
+/// Fenêtre de confirmation par-dessus tout, sur un fond assombri : une icône rouge, un titre, une
+/// explication, puis « Annuler » et le bouton d'action en rouge. Renvoie `Some(true)` si l'action est
+/// confirmée (bouton, ou Entrée si `enter_ok`), `Some(false)` si elle est annulée (Annuler, Échap,
+/// clic à côté), `None` tant qu'on n'a pas choisi. `key` distingue les fenêtres (pour l'animation).
+pub(crate) fn confirm_dialog(ctx: &egui::Context, key: &str, icon: &str, title: &str, lines: &[&str], action: &str, enter_ok: bool) -> Option<bool> {
+    let id = egui::Id::new(("confirm_dialog", key));
+    let now = ctx.input(|i| i.time);
+    let t0 = ctx.data_mut(|d| *d.get_temp_mut_or(id, now));
+    let k = crate::gallery::ease_out((((now - t0) as f32) / 0.2).min(1.0));
+    if k < 1.0 {
+        ctx.request_repaint();
+    }
+    let screen = ctx.screen_rect();
+    let mut answer: Option<bool> = None;
+    // fond assombri (un cran sous la fenêtre) : il retient les clics, et un clic dessus annule
+    egui::Area::new(id.with("dim")).order(egui::Order::Middle).fixed_pos(screen.min).show(ctx, |ui| {
+        let (_, r) = ui.allocate_exact_size(screen.size(), Sense::click());
+        ui.painter().rect_filled(screen, 0.0, Color32::from_black_alpha((120.0 * k) as u8));
+        if r.clicked() {
+            answer = Some(false);
+        }
+    });
+    let red = Color32::from_rgb(220, 60, 60);
+    egui::Area::new(id.with("card")).order(egui::Order::Foreground).anchor(Align2::CENTER_CENTER, vec2(0.0, 12.0 * (1.0 - k))).show(ctx, |ui| {
+        ui.multiply_opacity(k);
+        let dark = ui.visuals().dark_mode;
+        egui::Frame::none()
+            .fill(ui.visuals().window_fill)
+            .rounding(20.0)
+            .stroke(Stroke::new(1.0_f32, ui.visuals().widgets.noninteractive.bg_stroke.color))
+            .shadow(egui::epaint::Shadow { offset: vec2(0.0, 14.0), blur: 44.0, spread: 0.0, color: Color32::from_black_alpha(if dark { 160 } else { 60 }) })
+            .inner_margin(egui::Margin::same(24.0))
+            .show(ui, |ui| {
+                ui.set_width(400.0_f32.min(screen.width() - 80.0));
+                ui.horizontal(|ui| {
+                    let (r, _) = ui.allocate_exact_size(vec2(40.0, 40.0), Sense::hover());
+                    ui.painter().circle_filled(r.center(), 20.0, Color32::from_rgba_unmultiplied(220, 60, 60, if dark { 50 } else { 36 }));
+                    ui.painter().text(r.center(), Align2::CENTER_CENTER, icon, FontId::proportional(19.0), red);
+                    ui.add_space(4.0);
+                    ui.label(bold_text(title, 18.0));
+                });
+                ui.add_space(6.0);
+                for l in lines {
+                    ui.label(egui::RichText::new(*l).color(ui.visuals().weak_text_color()));
+                }
+                ui.add_space(14.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let t = egui::RichText::new(format!("{icon}  {action}")).color(Color32::WHITE).family(egui::FontFamily::Name("bold".into()));
+                    if ui.add(egui::Button::new(t).fill(red).stroke(Stroke::NONE).rounding(18.0).min_size(vec2(0.0, 36.0))).clicked() {
+                        answer = Some(true);
+                    }
+                    if crate::gallery::form::ghost(ui, "", tr("Annuler")).clicked() {
+                        answer = Some(false);
+                    }
+                });
+            });
+    });
+    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        answer = Some(false);
+    }
+    if enter_ok && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
+        answer = Some(true);
+    }
+    if answer.is_some() {
+        ctx.data_mut(|d| d.remove::<f64>(id)); // la prochaine ouverture rejouera l'animation
+    }
+    answer
+}
+
 /// Drapeau « fermer le menu déroulant ouvert », posé par `close_dropdown`.
 fn dropdown_close_id() -> egui::Id {
     egui::Id::new("dropdown_close")

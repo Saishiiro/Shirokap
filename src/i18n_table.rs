@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 400] = [
+pub static TABLE: [[&str; 5]; 403] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -403,4 +403,7 @@ pub static TABLE: [[&str; 5]; 400] = [
     ["Visionneuse", "Viewer", "Visor", "Bildbetrachter", "查看器"],
     ["Durée de chaque image du diaporama", "Time per image in the slideshow", "Duración de cada imagen en la presentación", "Anzeigedauer pro Bild in der Diashow", "幻灯片每张图片的显示时间"],
     ["Temps d'affichage d'une capture avant de passer à la suivante (Espace lance le diaporama dans la visionneuse). L'ordre se choisit dans le menu « Plus… » de la visionneuse.", "How long a screenshot stays on screen before the next one (Space starts the slideshow in the viewer). The order is set in the viewer's “More…” menu.", "Tiempo que se muestra una captura antes de pasar a la siguiente (Espacio inicia la presentación en el visor). El orden se elige en el menú «Más…» del visor.", "Wie lange eine Aufnahme angezeigt wird, bevor die nächste kommt (Leertaste startet die Diashow im Bildbetrachter). Die Reihenfolge legst du im Menü „Mehr…“ des Bildbetrachters fest.", "每张截图显示多久后切换到下一张（在查看器中按空格开始幻灯片）。顺序可在查看器的“更多…”菜单中选择。"],
+    ["Mettre à la corbeille ?", "Move to the Recycle Bin?", "¿Mover a la papelera?", "In den Papierkorb verschieben?", "移到回收站？"],
+    ["{0} capture(s) sélectionnée(s) vont partir dans la corbeille.", "{0} selected screenshot(s) will go to the Recycle Bin.", "{0} captura(s) seleccionada(s) irán a la papelera.", "{0} ausgewählte Aufnahme(n) werden in den Papierkorb verschoben.", "{0} 张选中的截图将被移到回收站。"],
+    ["Tu pourras les récupérer depuis la corbeille de Windows, ou avec « Annuler » dans la notification.", "You can get them back from the Windows Recycle Bin, or with “Undo” in the notification.", "Podrás recuperarlas desde la papelera de Windows o con «Deshacer» en la notificación.", "Du kannst sie aus dem Windows-Papierkorb oder mit „Rückgängig“ in der Benachrichtigung zurückholen.", "可以从 Windows 回收站中恢复，或点击通知中的“撤销”。"],
 ];
