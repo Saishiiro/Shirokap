@@ -408,7 +408,8 @@ impl App {
             )
         });
         // pas de raccourcis pendant qu'on tape un nom
-        let k = if ctx.wants_keyboard_input() { (false, false, false, false, false, false, false) } else { k };
+        // (ni pendant la confirmation de la corbeille : Échap et Entrée sont pour elle)
+        let k = if ctx.wants_keyboard_input() || self.confirm_trash.is_some() { (false, false, false, false, false, false, false) } else { k };
         if k.0 {
             step = -1;
         }
@@ -453,9 +454,7 @@ impl App {
             self.toggle_fav(path.clone());
         }
         if del {
-            self.trash(vec![path]);
-            self.view = None;
-            return;
+            self.confirm_trash = Some(vec![path.clone()]); // confirmation d'abord (voir `confirm_trash`)
         }
         let n = pos as i32 + step;
         if step != 0 && n >= 0 && (n as usize) < vis.len() {
@@ -476,7 +475,7 @@ impl App {
                 ui.painter().rect_filled(area, 14.0, ui.visuals().extreme_bg_color);
             }
             let inner = if self.fullscreen { area } else { area.shrink(12.0) };
-            let keys = !ctx.wants_keyboard_input() && self.rename.is_none();
+            let keys = !ctx.wants_keyboard_input() && self.rename.is_none() && self.confirm_trash.is_none();
             let r = self.zoom.update(ui, &resp, inner, s, crate::zoom::Pan::Primary, keys, true);
             self.view_rect = Some(r);
             // ouverture depuis la grille : l'image vole depuis sa miniature (dessinée par-dessus, voir `Fly`)

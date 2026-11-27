@@ -417,7 +417,7 @@ impl App {
                             let rc = ui.interact(r_copy, id.with(("copy", i)), Sense::click()).on_hover_text(tr("Copier l'image"));
                             let rf = ui.interact(r_fav, id.with(("fav", i)), Sense::click()).on_hover_text(tr("Favori"));
                             if rt.clicked() {
-                                acts.push(Act::Trash(vec![path.clone()]));
+                                acts.push(Act::AskTrash(vec![path.clone()]));
                                 hit = true;
                             }
                             if rc.clicked() {
@@ -481,7 +481,7 @@ impl App {
                             }
                             ui.separator();
                             if menu_item_colored(ui, icons::TRASH, tr("Mettre à la corbeille"), false, "", Some(col(239, 68, 68))).clicked() {
-                                acts.push(Act::Trash(vec![path.clone()]));
+                                acts.push(Act::AskTrash(vec![path.clone()]));
                                 ui.close_menu();
                             }
                         });
@@ -519,7 +519,6 @@ impl App {
                 Act::Reveal(p) => {
                     let _ = Command::new("explorer").arg("/select,").arg(&p).spawn();
                 }
-                Act::Trash(v) => self.trash(v),
                 Act::AskTrash(v) => self.confirm_trash = Some(v),
                 Act::Path(p) => {
                     copy_text(&p.display().to_string());

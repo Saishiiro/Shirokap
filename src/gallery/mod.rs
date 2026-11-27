@@ -67,8 +67,7 @@ enum Act {
     Fav(PathBuf),
     Copy(PathBuf),
     Reveal(PathBuf),
-    Trash(Vec<PathBuf>),
-    AskTrash(Vec<PathBuf>), // corbeille de la sélection : on demande d'abord confirmation
+    AskTrash(Vec<PathBuf>), // corbeille : on demande d'abord confirmation
     Path(PathBuf),
     Edit(PathBuf),
     Pin(PathBuf),
@@ -680,14 +679,21 @@ impl eframe::App for App {
             self.rename_dlg = None;
             self.rename_file(&p, &n);
         }
-        // corbeille de la sélection : on demande confirmation (Entrée confirme, Échap annule)
+        // corbeille (sélection, bouton d'une miniature, clic droit, visionneuse) : on demande confirmation
+        // (Entrée confirme, Échap annule)
         if let Some(list) = &self.confirm_trash {
-            let n = list.len();
-            let what = trf("{0} capture(s) sélectionnée(s) vont partir dans la corbeille.", &[&n]);
+            let what = match list.as_slice() {
+                [one] => trf("« {0} » va partir dans la corbeille.", &[&file_name(one)]),
+                _ => trf("{0} capture(s) sélectionnée(s) vont partir dans la corbeille.", &[&list.len()]),
+            };
             let lines = [what.as_str(), tr("Tu pourras les récupérer depuis la corbeille de Windows, ou avec « Annuler » dans la notification.")];
             match confirm_dialog(ctx, "trash", icons::TRASH, tr("Mettre à la corbeille ?"), &lines, tr("Mettre à la corbeille"), true) {
                 Some(true) => {
                     let v = self.confirm_trash.take().unwrap_or_default();
+                    // la capture affichée part : on revient à la galerie (les numéros des captures vont changer)
+                    if self.view.and_then(|i| self.items.get(i)).map(|it| v.contains(&it.path)).unwrap_or(false) {
+                        self.view = None;
+                    }
                     self.trash(v);
                 }
                 Some(false) => self.confirm_trash = None,
