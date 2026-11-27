@@ -4,8 +4,10 @@ use super::*;
 impl App {
     // ----- paramètres -----
     pub(super) fn settings_ui(&mut self, ui: &mut egui::Ui) {
+        // fenêtre étroite : les rubriques se réduisent à leurs tuiles (leur nom s'affiche au survol)
+        let compact = ui.available_width() < 760.0;
         egui::SidePanel::left("set_nav")
-            .exact_width(210.0)
+            .exact_width(if compact { 48.0 } else { 210.0 })
             .resizable(false)
             .show_separator_line(false)
             .frame(egui::Frame::none())
@@ -22,17 +24,27 @@ impl App {
                 .into_iter()
                 .enumerate()
                 {
-                    cat_item(ui, &mut self.set_cat, c, i, name, cat_tint(n));
+                    if compact {
+                        cat_tile(ui, &mut self.set_cat, c, i, name, cat_tint(n));
+                    } else {
+                        cat_item(ui, &mut self.set_cat, c, i, name, cat_tint(n));
+                    }
                 }
                 ui.add_space(14.0);
                 // remet toutes les rubriques à zéro (rien n'est appliqué avant « Enregistrer »)
-                let reset = egui::Button::new(egui::RichText::new(ic(icons::RESET, tr("Tout réinitialiser"))).size(13.5))
+                let text = if compact { icons::RESET.to_string() } else { ic(icons::RESET, tr("Tout réinitialiser")) };
+                let reset = egui::Button::new(egui::RichText::new(text).size(13.5))
                     .fill(Color32::TRANSPARENT)
                     .stroke(Stroke::NONE)
                     .rounding(18.0);
                 if ui
                     .add(reset)
-                    .on_hover_text(tr("Remet TOUS les réglages de TOUTES les rubriques à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer » (« Annuler » permet de revenir en arrière)."))
+                    .on_hover_ui(|ui| {
+                        if compact {
+                            ui.strong(tr("Tout réinitialiser"));
+                        }
+                        ui.label(tr("Remet TOUS les réglages de TOUTES les rubriques à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer » (« Annuler » permet de revenir en arrière)."));
+                    })
                     .clicked()
                 {
                     self.cfg = Config::default();
@@ -47,7 +59,7 @@ impl App {
         if k < 1.0 {
             ui.ctx().request_repaint();
         }
-        let pad = egui::Margin { left: 18.0 + 28.0 * (1.0 - k), right: 0.0, top: 0.0, bottom: 0.0 };
+        let pad = egui::Margin { left: if compact { 10.0 } else { 18.0 } + 28.0 * (1.0 - k), right: 0.0, top: 0.0, bottom: 0.0 };
         egui::Frame::none().inner_margin(pad).show(ui, |ui| {
             ui.multiply_opacity(k);
             egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {

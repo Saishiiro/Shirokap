@@ -592,7 +592,8 @@ impl Editor {
         let mut save: Option<bool> = None; // Some(false) = copie, Some(true) = remplacer l'original
         let mut undo = false;
         let mut redo = false;
-        ui.horizontal_wrapped(|ui| {
+        // la barre d'outils garde sa place : si la fenêtre est trop étroite, elle est coupée au lieu d'élargir la toile
+        crate::gallery::ui_kit::contained(ui, |ui| ui.horizontal_wrapped(|ui| {
             let ic = |i: &str, t: &str| format!("{i}  {t}");
             if ui.button(ic(icons::BACK, tr("← Fermer").trim_start_matches("← "))).clicked() {
                 exit = Exit::Close;
@@ -658,7 +659,7 @@ impl Editor {
                     ui.close_menu();
                 }
             });
-        });
+        }));
         if self.pending.is_none() {
             // Ctrl+Z : annuler · Ctrl+Y ou Ctrl+Maj+Z : rétablir
             let (z, y, shift) = ui.input(|i| (i.modifiers.command && i.key_pressed(Key::Z), i.modifiers.command && i.key_pressed(Key::Y), i.modifiers.shift));

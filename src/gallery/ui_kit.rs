@@ -469,6 +469,51 @@ pub(crate) fn cat_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, cat:
     }
 }
 
+/// Rubrique des paramètres en version compacte (fenêtre étroite) : seulement la tuile de l'icône.
+pub(crate) fn cat_tile<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, cat: T, icon: &str, label: &str, tint: Color32) {
+    let selected = *cur == cat;
+    let (rect, resp) = ui.allocate_exact_size(vec2(44.0, 44.0), Sense::click());
+    let resp = resp.on_hover_text(label);
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
+    let v = ui.visuals();
+    let acc = accent_of(v);
+    let dark = v.dark_mode;
+    let p = ui.painter();
+    if hk * (1.0 - sk) > 0.01 {
+        p.rect_filled(rect, 12.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(0.6 * hk * (1.0 - sk)));
+    }
+    if sk > 0.01 {
+        p.rect_filled(rect, 12.0, v.faint_bg_color.gamma_multiply(sk));
+    }
+    let tile = Rect::from_center_size(rect.center(), vec2(28.0, 28.0));
+    let soft = Color32::from_rgba_unmultiplied(tint.r(), tint.g(), tint.b(), if dark { 42 } else { 52 });
+    p.rect_filled(tile, 8.0, soft.gamma_multiply(1.0 - sk));
+    if sk > 0.01 {
+        p.rect_filled(tile, 8.0, acc.gamma_multiply(sk));
+    }
+    let tint_fg = if dark { tint.lerp_to_gamma(Color32::WHITE, 0.3) } else { tint.lerp_to_gamma(Color32::BLACK, 0.3) };
+    p.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), tint_fg.lerp_to_gamma(on_accent(acc), sk));
+    if resp.clicked() {
+        *cur = cat;
+    }
+}
+
+/// Place `add` dans sa propre zone, à la largeur disponible : si un élément y dépasse (fenêtre trop
+/// étroite), il est coupé au lieu d'élargir toute la page et de faire déborder ce qui suit.
+pub(crate) fn contained<R>(ui: &mut egui::Ui, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
+    let avail = ui.available_rect_before_wrap();
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(avail).layout(*ui.layout()));
+    child.set_clip_rect(avail.expand(4.0).intersect(ui.clip_rect()));
+    let r = add(&mut child);
+    let h = child.min_rect().height();
+    ui.allocate_exact_size(vec2(avail.width(), h), Sense::hover());
+    r
+}
+
 /// Petite étiquette de touche (« F11 », « Ctrl K »), calée à droite sur `right_center`. Renvoie sa place.
 pub(crate) fn kbd_chip(ui: &egui::Ui, right_center: Pos2, text: &str) -> Rect {
     let v = ui.visuals();

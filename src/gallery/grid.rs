@@ -64,9 +64,8 @@ impl App {
         let mut folders: Vec<String> = self.items.iter().map(|i| i.folder.clone()).filter(|f| !f.is_empty()).collect();
         folders.sort();
         folders.dedup();
-        ui.scope(|ui| {
-        // marge à droite + curseur plus court : la barre passe à la ligne au lieu de déborder
-        ui.set_max_width((ui.available_width() - 20.0).max(200.0));
+        contained(ui, |ui| {
+        // curseur plus court : la barre passe à la ligne au lieu de déborder
         ui.spacing_mut().slider_width = 120.0;
         ui.horizontal_wrapped(|ui| {
             ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(ic(icons::SEARCH, tr("Rechercher…"))).desired_width(240.0));

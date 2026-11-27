@@ -137,12 +137,14 @@ struct App {
     cat_at: Instant,     // changement de rubrique des paramètres
     sel_shown: usize,    // nombre affiché dans la barre de sélection (gardé pendant qu'elle se replie)
     sheet_rect: Rect,    // feuille de contenu (pour placer les éléments flottants)
+    narrow: bool,                // fenêtre étroite : le menu latéral se replie tout seul
+    nav_restore: Option<bool>,   // état du menu à rétablir quand la fenêtre redevient large
 }
 
 pub fn run(settings: bool) {
     let mut viewport = egui::ViewportBuilder::default()
         .with_inner_size([1100.0, 700.0])
-        .with_min_inner_size([620.0, 420.0]);
+        .with_min_inner_size([720.0, 480.0]);
     if let Ok(i) = image::load_from_memory(include_bytes!("../../assets/logo.png")) {
         let i = i.resize_exact(64, 64, image::imageops::FilterType::Lanczos3).to_rgba8();
         viewport = viewport.with_icon(egui::IconData { rgba: i.into_raw(), width: 64, height: 64 });
@@ -240,6 +242,8 @@ impl App {
             cat_at: Instant::now() - Duration::from_secs(1),
             sel_shown: 0,
             sheet_rect: Rect::NOTHING,
+            narrow: false,
+            nav_restore: None,
         }
     }
 
@@ -451,7 +455,7 @@ impl App {
                 Sort::Size => 3,
             },
             favs_only: self.favs_only,
-            sidebar: self.sidebar_open,
+            sidebar: self.nav_restore.unwrap_or(self.sidebar_open), // pas le repli automatique
             welcomed: !self.show_welcome,
             slide_new_first: self.slide_new_first,
         });
@@ -745,6 +749,18 @@ impl eframe::App for App {
 
         let immersive = self.fullscreen && self.view.is_some() && self.editor.is_none() && self.compare.is_none();
         let pal = self.shown_pal;
+        // fenêtre étroite : le menu latéral se replie pour laisser la place au contenu, puis revient
+        // dans son état d'avant quand la fenêtre s'élargit (on peut toujours l'ouvrir à la main entre-temps)
+        let narrow = ctx.screen_rect().width() < 940.0;
+        if narrow != self.narrow {
+            if narrow {
+                self.nav_restore = Some(self.sidebar_open);
+                self.sidebar_open = false;
+            } else if let Some(open) = self.nav_restore.take() {
+                self.sidebar_open = open;
+            }
+            self.narrow = narrow;
+        }
         if !immersive {
         // menu latéral : un panneau arrondi posé sur le fond de la fenêtre. Il s'ouvre et se replie
         // en glissant (une colonne d'icônes une fois replié)
@@ -881,6 +897,8 @@ impl eframe::App for App {
             ui.painter().rect_filled(sheet, 18.0, pal.bg);
             let inner = sheet.shrink2(vec2(22.0, 16.0));
             let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(egui::Layout::top_down(egui::Align::Min)));
+            // rien ne déborde de la feuille, même si la fenêtre devient très étroite
+            ui.set_clip_rect(sheet.intersect(ui.clip_rect()));
             let ui = &mut ui;
             // en-tête des pages : titre à gauche, barre de commandes (Ctrl+K) à droite
             // (pas dans la visionneuse, l'éditeur ni le comparateur, qui ont leur propre barre)
