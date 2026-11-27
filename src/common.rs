@@ -60,71 +60,25 @@ pub struct Config {
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
 }
 
-thread_local! {
-    static ANIMATING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-    static LAST_FRAME: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
-}
-
-/// Signale qu'une animation est en cours : l'image suivante sera dessinée sans attendre.
-pub fn mark_animating() {
-    ANIMATING.with(|a| a.set(true));
-}
-
-/// Fréquence d'images intelligente (à appeler au début de chaque `update`).
-/// Quand quelque chose bouge à l'écran (animation, défilement, glisser, clic, clavier), on dessine à la
-/// fréquence de l'écran (144 Hz, 165 Hz…) pour que ce soit fluide. Quand la souris se déplace simplement
-/// sans rien changer à l'affichage, on se limite à 60 images par seconde : l'œil ne voit pas la différence
-/// (le curseur est dessiné par Windows) mais le processeur, si.
-pub fn frame_cap(ctx: &eframe::egui::Context) {
-    use eframe::egui::{Event, Vec2};
+/// Limite les fenêtres à 60 images par seconde (à appeler au début de chaque `update`).
+/// Sans limite, chaque mouvement de souris redessine la fenêtre à la fréquence de l'écran (144 Hz, 165 Hz…)
+/// et le processeur monte pour rien. On dort le temps restant : les mouvements arrivés entre-temps sont traités d'un coup.
+pub fn frame_cap() {
+    use std::cell::Cell;
     use std::time::{Duration, Instant};
-    let animating = ANIMATING.with(|a| a.replace(false));
-    let busy = animating
-        || ctx.input(|i| {
-            i.pointer.any_down()
-                || i.smooth_scroll_delta != Vec2::ZERO
-                || i.zoom_delta() != 1.0
-                || i.events.iter().any(|e| !matches!(e, Event::PointerMoved(_) | Event::MouseMoved(_) | Event::PointerGone))
-        });
-    let now = Instant::now();
-    if !busy {
-        let min = Duration::from_micros(16_600);
-        if let Some(t) = LAST_FRAME.with(|l| l.get()) {
-            let dt = now - t;
+    thread_local! {
+        static LAST: Cell<Option<Instant>> = const { Cell::new(None) };
+    }
+    let min = Duration::from_micros(16_600);
+    LAST.with(|l| {
+        if let Some(t) = l.get() {
+            let dt = t.elapsed();
             if dt < min {
                 std::thread::sleep(min - dt);
             }
         }
-    }
-    LAST_FRAME.with(|l| l.set(Some(Instant::now())));
-}
-
-/// Raccourcis d'animation qui préviennent `frame_cap` tant que l'animation n'est pas finie.
-pub trait Anim {
-    fn anim_b(&self, id: eframe::egui::Id, on: bool, secs: f32) -> f32;
-    fn anim_be(&self, id: eframe::egui::Id, on: bool, secs: f32, easing: fn(f32) -> f32) -> f32;
-    fn anim_repaint(&self);
-}
-
-impl Anim for eframe::egui::Context {
-    fn anim_b(&self, id: eframe::egui::Id, on: bool, secs: f32) -> f32 {
-        let v = self.animate_bool_with_time(id, on, secs);
-        if v != 0.0 && v != 1.0 {
-            mark_animating();
-        }
-        v
-    }
-    fn anim_be(&self, id: eframe::egui::Id, on: bool, secs: f32, easing: fn(f32) -> f32) -> f32 {
-        let v = self.animate_bool_with_time_and_easing(id, on, secs, easing);
-        if v != 0.0 && v != 1.0 {
-            mark_animating();
-        }
-        v
-    }
-    fn anim_repaint(&self) {
-        mark_animating();
-        self.request_repaint();
-    }
+        l.set(Some(Instant::now()));
+    });
 }
 
 /// Couleur d'accent propre à chaque thème (mode « Auto »).

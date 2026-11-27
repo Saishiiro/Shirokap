@@ -231,7 +231,7 @@ impl App {
         };
         let k = ease_out((opened.elapsed().as_secs_f32() / 0.22).min(1.0));
         if k < 1.0 {
-            ctx.anim_repaint();
+            ctx.request_repaint();
         }
         let screen = ctx.screen_rect();
         let mut chosen: Option<Cmd> = None;

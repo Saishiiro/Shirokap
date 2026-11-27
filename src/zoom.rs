@@ -2,7 +2,6 @@
 //!
 //! Molette : zoom vers le curseur · glisser : déplacer · double-clic : ajuster / taille réelle ·
 //! + et − : zoom · 0 : ajuster à la fenêtre · 1 : taille réelle. Les changements sont animés.
-use crate::common::Anim;
 use crate::i18n::{lang, tr, FR};
 use eframe::egui::{self, pos2, vec2, Color32, Key, PointerButton, Pos2, Rect, Response, Stroke, Vec2};
 
@@ -195,7 +194,7 @@ impl Zoom {
             self.shown_offset = self.offset;
             self.anchor = None;
         } else {
-            ctx.anim_repaint();
+            ctx.request_repaint();
         }
         Rect::from_center_size(area.center() + self.shown_offset, img * self.shown_scale)
     }
@@ -212,7 +211,7 @@ impl Zoom {
             self.last_move = now;
         }
         let awake = now - self.last_move < 2.2;
-        let k = ctx.anim_be(egui::Id::new("zoom_bar").with(area.min.x as i32), awake, 0.3, egui::emath::easing::cubic_out);
+        let k = ctx.animate_bool_with_time_and_easing(egui::Id::new("zoom_bar").with(area.min.x as i32), awake, 0.3, egui::emath::easing::cubic_out);
         if awake {
             ctx.request_repaint_after(std::time::Duration::from_millis(400));
         }

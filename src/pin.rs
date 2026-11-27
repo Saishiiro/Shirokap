@@ -37,7 +37,7 @@ pub fn run(path: String) {
 
 impl eframe::App for Pin {
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        crate::common::frame_cap(ctx); // fluide quand ça bouge, économe sinon
+        crate::common::frame_cap(); // au plus 60 images par seconde
         let (pressed, scroll, esc, rclick) = ctx.input(|i| {
             (
                 i.pointer.primary_pressed(),
