@@ -112,6 +112,8 @@ impl App {
                 egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
                     ui.set_width(cw - 40.0);
                     ui.set_height(panel_h - 40.0);
+                    // le panneau peut être placé dans une ligne : son contenu, lui, s'empile de haut en bas
+                    ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new(icons::CALENDAR).color(v.weak_text_color()));
                         ui.label(bold_text(tr("7 derniers jours"), 15.0));
@@ -151,6 +153,7 @@ impl App {
                         let lf = if today_col { FontId::new(12.5, egui::FontFamily::Name("bold".into())) } else { FontId::proportional(12.5) };
                         p.text(pos2(cx, area.max.y - 2.0), Align2::CENTER_BOTTOM, label, lf, if today_col { v.text_color() } else { v.weak_text_color() });
                     }
+                    });
                 });
             };
             let palette_cols = [acc, col(244, 114, 182), col(56, 189, 248), col(251, 191, 36), col(52, 211, 153), col(251, 146, 60), col(167, 139, 250), col(148, 163, 184)];
@@ -158,6 +161,7 @@ impl App {
                 egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
                     ui.set_width(fw - 40.0);
                     ui.set_min_height(panel_h - 40.0);
+                    ui.vertical(|ui| {
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new(icons::FOLDER).color(v.weak_text_color()));
                         ui.label(bold_text(tr("Dossiers / jeux"), 15.0));
@@ -180,8 +184,12 @@ impl App {
                         p.rect_filled(track, 4.0, v.faint_bg_color);
                         let fill_w = (track.width() * *c as f32 / top as f32).max(8.0) * grow;
                         p.rect_filled(Rect::from_min_size(track.min, vec2(fill_w, track.height())), 4.0, palette_cols[n % palette_cols.len()]);
+                        if grow < 1.0 {
+                            ui.ctx().request_repaint();
+                        }
                         ui.add_space(6.0);
                     }
+                    });
                 });
             };
             if side {

@@ -264,12 +264,18 @@ pub fn clean(s: &str, max: usize) -> String {
 pub fn human(b: u64) -> String {
     let b = b as f64;
     let [ko, mo, go] = crate::i18n::size_units();
-    if b >= 1e9 {
+    let s = if b >= 1e9 {
         format!("{:.1} {go}", b / 1e9)
     } else if b >= 1e6 {
         format!("{:.1} {mo}", b / 1e6)
     } else {
         format!("{:.0} {ko}", b / 1e3)
+    };
+    // virgule décimale en français, espagnol et allemand (« 10,6 Mo »)
+    if crate::i18n::decimal_comma() {
+        s.replacen('.', ",", 1)
+    } else {
+        s
     }
 }
 

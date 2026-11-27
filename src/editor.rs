@@ -624,96 +624,93 @@ impl Editor {
         let mut undo = false;
         let mut redo = false;
         // la barre d'outils garde sa place : si la fenêtre est trop étroite, elle est coupée au lieu d'élargir la toile
-        crate::gallery::ui_kit::contained(ui, |ui| ui.horizontal_wrapped(|ui| {
-            use crate::gallery::form::{ghost, pill};
+        let (can_undo, can_redo) = (!self.ops.is_empty(), !self.redo.is_empty());
+        let (mut copy, mut confirm) = (false, false);
+        let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
+        // ligne 1 : Fermer et les outils à gauche ; historique, copie et enregistrement calés à droite
+        crate::gallery::ui_kit::contained(ui, |ui| {
+            use crate::gallery::form::{ghost, pill, split_row};
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             let ic = |i: &str, t: &str| format!("{i}  {t}");
-            if ghost(ui, icons::BACK, tr("← Fermer").trim_start_matches("← ")).clicked() {
-                exit = Exit::Close;
-            }
-            // les outils, regroupés dans une pilule en retrait ; l'outil choisi est plein de la couleur d'accent
-            let inset = ui.visuals().extreme_bg_color;
-            egui::Frame::none().fill(inset).rounding(21.0).inner_margin(egui::Margin::same(4.0)).show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
-                    if tool_btn(ui, self.tool == Tool::Pen, icons::PEN, tr("Stylo"), false).clicked() {
-                        self.tool = Tool::Pen;
+            split_row(
+                ui,
+                "editor_bar",
+                |ui| {
+                    if ghost(ui, icons::BACK, tr("← Fermer").trim_start_matches("← ")).clicked() {
+                        exit = Exit::Close;
                     }
-                    let cur_shape = SHAPES.iter().find(|s| s.0 == self.shape).map(|s| tr(s.1)).unwrap_or(tr("Rectangle"));
-                    let shapes_label = if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() };
-                    let sr = tool_btn(ui, self.tool == Tool::Shape, icons::SHAPES, &shapes_label, true);
-                    let pop = ui.make_persistent_id("shapes_popup");
-                    if sr.clicked() {
-                        ui.memory_mut(|m| m.toggle_popup(pop));
-                    }
-                    egui::popup::popup_below_widget(ui, pop, &sr, egui::PopupCloseBehavior::CloseOnClick, |ui| {
-                        ui.set_min_width(170.0);
-                        for (k, name) in SHAPES {
-                            if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
-                                self.shape = k;
-                                self.tool = Tool::Shape;
+                    // les outils, regroupés dans une pilule en retrait ; l'outil choisi est plein de la couleur d'accent
+                    let inset = ui.visuals().extreme_bg_color;
+                    egui::Frame::none().fill(inset).rounding(21.0).inner_margin(egui::Margin::same(4.0)).show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
+                            if tool_btn(ui, self.tool == Tool::Pen, icons::PEN, tr("Stylo"), false).clicked() {
+                                self.tool = Tool::Pen;
                             }
+                            let cur_shape = SHAPES.iter().find(|s| s.0 == self.shape).map(|s| tr(s.1)).unwrap_or(tr("Rectangle"));
+                            let shapes_label = if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() };
+                            let sr = tool_btn(ui, self.tool == Tool::Shape, icons::SHAPES, &shapes_label, true);
+                            let pop = ui.make_persistent_id("shapes_popup");
+                            if sr.clicked() {
+                                ui.memory_mut(|m| m.toggle_popup(pop));
+                            }
+                            egui::popup::popup_below_widget(ui, pop, &sr, egui::PopupCloseBehavior::CloseOnClick, |ui| {
+                                ui.set_min_width(170.0);
+                                for (k, name) in SHAPES {
+                                    if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
+                                        self.shape = k;
+                                        self.tool = Tool::Shape;
+                                    }
+                                }
+                            });
+                            for (t, i, n) in [
+                                (Tool::Highlight, icons::HIGHLIGHT, tr("Surligneur")),
+                                (Tool::Blur, icons::BLUR, tr("Flou")),
+                                (Tool::Text, icons::TEXT, tr("Texte")),
+                                (Tool::Step, icons::STEP, tr("Étape n°")),
+                                (Tool::Eraser, icons::ERASER, tr("Gomme")),
+                            ] {
+                                if tool_btn(ui, self.tool == t, i, n, false).clicked() {
+                                    self.tool = t;
+                                }
+                            }
+                        });
+                    });
+                },
+                |ui| {
+                    if ui.add_enabled_ui(can_undo, |ui| pill(ui, icons::UNDO, tr("Annuler|modif"))).inner.on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
+                        undo = true;
+                    }
+                    if ui.add_enabled_ui(can_redo, |ui| pill(ui, icons::REDO, tr("Rétablir"))).inner.on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
+                        redo = true;
+                    }
+                    if pill(ui, icons::COPY, tr("Copier")).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
+                        copy = true;
+                    }
+                    let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc)).family(egui::FontFamily::Name("bold".into())))
+                        .fill(acc)
+                        .stroke(Stroke::NONE)
+                        .rounding(18.0)
+                        .min_size(vec2(0.0, 36.0));
+                    if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
+                        save = Some(false);
+                    }
+                    dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
+                        if ui.button(tr("Remplacer l'original")).clicked() {
+                            confirm = true;
+                            ui.close_menu();
                         }
                     });
-                    for (t, i, n) in [
-                        (Tool::Highlight, icons::HIGHLIGHT, tr("Surligneur")),
-                        (Tool::Blur, icons::BLUR, tr("Flou")),
-                        (Tool::Text, icons::TEXT, tr("Texte")),
-                        (Tool::Step, icons::STEP, tr("Étape n°")),
-                        (Tool::Eraser, icons::ERASER, tr("Gomme")),
-                    ] {
-                        if tool_btn(ui, self.tool == t, i, n, false).clicked() {
-                            self.tool = t;
-                        }
-                    }
-                });
-            });
-            // couleur et taille de l'outil
-            if !matches!(self.tool, Tool::Eraser | Tool::Blur) {
-                color_button(ui, "annot", &mut self.col);
-            }
-            ui.spacing_mut().slider_width = 120.0;
-            match self.tool {
-                Tool::Text | Tool::Step => {
-                    ui.add(egui::Slider::new(&mut self.tsize, 12.0..=160.0).text(tr("Taille")));
-                }
-                Tool::Eraser => {
-                    ui.add(egui::Slider::new(&mut self.ew, 4.0..=120.0).text(tr("Taille")));
-                }
-                Tool::Highlight | Tool::Blur => {}
-                _ => {
-                    ui.add(egui::Slider::new(&mut self.width, 2.0..=30.0).text(tr("épaisseur")));
-                }
-            }
-            ui.add_space(6.0);
-            let can_undo = !self.ops.is_empty();
-            if ui.add_enabled_ui(can_undo, |ui| pill(ui, icons::UNDO, tr("Annuler|modif"))).inner.on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
-                undo = true;
-            }
-            let can_redo = !self.redo.is_empty();
-            if ui.add_enabled_ui(can_redo, |ui| pill(ui, icons::REDO, tr("Rétablir"))).inner.on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
-                redo = true;
-            }
-            if pill(ui, icons::COPY, tr("Copier")).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
-                copy_to_clipboard(&self.render());
-                self.status = format!("{}  {}", icons::COPY, tr("Copiée dans le presse-papiers"));
-            }
-            let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
-            let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc)).family(egui::FontFamily::Name("bold".into())))
-                .fill(acc)
-                .stroke(Stroke::NONE)
-                .rounding(18.0)
-                .min_size(vec2(0.0, 36.0));
-            if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
-                save = Some(false);
-            }
-            dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
-                if ui.button(tr("Remplacer l'original")).clicked() {
-                    self.confirm = true;
-                    ui.close_menu();
-                }
-            });
-        }));
+                },
+            );
+        });
+        if copy {
+            copy_to_clipboard(&self.render());
+            self.status = format!("{}  {}", icons::COPY, tr("Copiée dans le presse-papiers"));
+        }
+        if confirm {
+            self.confirm = true;
+        }
         if self.pending.is_none() {
             // Ctrl+Z : annuler · Ctrl+Y ou Ctrl+Maj+Z : rétablir
             let (z, y, shift) = ui.input(|i| (i.modifiers.command && i.key_pressed(Key::Z), i.modifiers.command && i.key_pressed(Key::Y), i.modifiers.shift));
@@ -730,34 +727,57 @@ impl Editor {
             self.redo();
         }
 
-        // saisie du texte à l'emplacement cliqué
+        // ligne 2 : couleur et taille de l'outil, puis l'aide (ou la saisie du texte à l'emplacement cliqué)
         let (mut commit, mut cancel) = (false, false);
-        if self.pending.is_some() {
-            ui.horizontal(|ui| {
-                ui.label(tr("Texte :"));
-                let out = egui::TextEdit::singleline(&mut self.buf).desired_width(340.0).show(ui);
-                let r = out.response;
-                if let Some(cr) = out.cursor_range {
-                    self.caret_idx = cr.primary.ccursor.index; // suit les flèches, Début/Fin, la souris…
+        crate::gallery::ui_kit::contained(ui, |ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+                if !matches!(self.tool, Tool::Eraser | Tool::Blur) {
+                    color_button(ui, "annot", &mut self.col);
                 }
-                r.request_focus();
-                if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
-                    commit = true;
+                let weak = ui.visuals().weak_text_color();
+                let size = match self.tool {
+                    Tool::Text | Tool::Step => Some((tr("Taille"), &mut self.tsize, 12.0..=160.0)),
+                    Tool::Eraser => Some((tr("Taille"), &mut self.ew, 4.0..=120.0)),
+                    Tool::Highlight | Tool::Blur => None,
+                    _ => Some((tr("épaisseur"), &mut self.width, 2.0..=30.0)),
+                };
+                if let Some((name, v, range)) = size {
+                    let mut c = name.chars();
+                    let name = c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default();
+                    ui.label(egui::RichText::new(name).color(weak));
+                    ui.spacing_mut().slider_width = 130.0;
+                    ui.add(egui::Slider::new(v, range).show_value(false));
+                    ui.label(egui::RichText::new(format!("{:.0}", *v)).color(weak));
                 }
-                if ui.button(tr("Ajouter")).clicked() {
-                    commit = true;
-                }
-                if ui.button(tr("Annuler")).clicked() {
-                    cancel = true;
+                ui.add_space(12.0);
+                if self.pending.is_some() {
+                    ui.label(tr("Texte :"));
+                    let out = egui::TextEdit::singleline(&mut self.buf).desired_width(340.0).margin(vec2(12.0, 9.0)).show(ui);
+                    let r = out.response;
+                    if let Some(cr) = out.cursor_range {
+                        self.caret_idx = cr.primary.ccursor.index; // suit les flèches, Début/Fin, la souris…
+                    }
+                    r.request_focus();
+                    if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        commit = true;
+                    }
+                    if ui.add(egui::Button::new(egui::RichText::new(tr("Ajouter")).color(on_accent(acc))).fill(acc).stroke(Stroke::NONE).rounding(18.0).min_size(vec2(0.0, 36.0))).clicked() {
+                        commit = true;
+                    }
+                    if crate::gallery::form::ghost(ui, "", tr("Annuler")).clicked() {
+                        cancel = true;
+                    }
+                } else {
+                    let hint = if self.status.is_empty() {
+                        tr("Glisse sur l'image pour annoter · Texte et Étape n° : clique à l'endroit voulu · Gomme : repasse sur une annotation pour l'effacer")
+                    } else {
+                        self.status.as_str()
+                    };
+                    ui.label(egui::RichText::new(hint).size(13.0).color(weak));
                 }
             });
-        } else {
-            ui.weak(if self.status.is_empty() {
-                tr("Glisse sur l'image pour annoter · Texte et Étape n° : clique à l'endroit voulu · Gomme : repasse sur une annotation pour l'effacer")
-            } else {
-                self.status.as_str()
-            });
-        }
+        });
         if commit {
             if let Some(q) = self.pending.take() {
                 if !self.buf.trim().is_empty() {

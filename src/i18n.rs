@@ -144,6 +144,11 @@ pub fn dfmt(long: bool) -> &'static str {
 }
 
 /// Tailles de fichiers : Ko/Mo/Go en français, KB/MB/GB ailleurs.
+/// Vrai si la langue écrit les nombres décimaux avec une virgule.
+pub fn decimal_comma() -> bool {
+    matches!(lang(), FR | ES | DE)
+}
+
 pub fn size_units() -> [&'static str; 3] {
     if lang() == FR {
         ["Ko", "Mo", "Go"]

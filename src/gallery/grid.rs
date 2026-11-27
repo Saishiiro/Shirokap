@@ -66,33 +66,54 @@ impl App {
         folders.dedup();
         // --- barre d'outils : recherche, tri et taille, puis filtres et actions (elle passe à la ligne si besoin) ---
         let all_picked = !vis.is_empty() && vis.iter().all(|&i| self.sel.contains(&self.items[i].path));
+        let any = !vis.is_empty();
+        let (mut select_all, mut deselect, mut open_dir, mut refresh) = (false, false, false, false);
         contained(ui, |ui| {
             ui.spacing_mut().slider_width = 110.0;
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-            ui.horizontal_wrapped(|ui| {
-                search_field(ui, &mut self.search, tr("Rechercher…"), 260.0);
-                let sort_name = match self.sort {
-                    Sort::Newest => tr("Plus récentes"),
-                    Sort::Oldest => tr("Plus anciennes"),
-                    Sort::Name => tr("Nom"),
-                    Sort::Size => tr("Taille"),
-                };
-                dropdown(ui, &ic(icons::SORT, sort_name), false, |ui| {
-                    for (s, n) in [(Sort::Newest, tr("Plus récentes")), (Sort::Oldest, tr("Plus anciennes")), (Sort::Name, tr("Nom")), (Sort::Size, tr("Taille"))] {
-                        if ui.selectable_label(self.sort == s, n).clicked() {
-                            self.sort = s;
-                            ui.close_menu();
+            // ligne 1 : recherche, tri et taille à gauche ; actions calées à droite
+            split_row(
+                ui,
+                "gallery_bar",
+                |ui| {
+                    search_field(ui, &mut self.search, tr("Rechercher…"), 260.0);
+                    let sort_name = match self.sort {
+                        Sort::Newest => tr("Plus récentes"),
+                        Sort::Oldest => tr("Plus anciennes"),
+                        Sort::Name => tr("Nom"),
+                        Sort::Size => tr("Taille"),
+                    };
+                    dropdown(ui, &ic(icons::SORT, sort_name), false, |ui| {
+                        for (s, n) in [(Sort::Newest, tr("Plus récentes")), (Sort::Oldest, tr("Plus anciennes")), (Sort::Name, tr("Nom")), (Sort::Size, tr("Taille"))] {
+                            if ui.selectable_label(self.sort == s, n).clicked() {
+                                self.sort = s;
+                                ui.close_menu();
+                            }
                         }
+                    });
+                    // taille des miniatures : petite image … grande image
+                    let weak = ui.visuals().weak_text_color();
+                    ui.label(egui::RichText::new(icons::IMAGE).size(13.0).color(weak)).on_hover_text(tr("Taille des miniatures"));
+                    ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false)).on_hover_text(tr("Taille des miniatures"));
+                    ui.label(egui::RichText::new(icons::IMAGE).size(18.0).color(weak));
+                },
+                |ui| {
+                    // tout sélectionner (ou tout désélectionner si tout est déjà sélectionné)
+                    if all_picked {
+                        deselect = pill(ui, icons::DESELECT, tr("Tout désélectionner")).clicked();
+                    } else {
+                        select_all = ui
+                            .add_enabled_ui(any, |ui| pill(ui, icons::SELECT_ALL, tr("Tout sélectionner")))
+                            .inner
+                            .on_hover_text(tr("Sélectionner toutes les captures affichées (Ctrl+A)"))
+                            .clicked();
                     }
-                });
-                // taille des miniatures : petit carré … grand carré
-                ui.add_space(4.0);
-                let weak = ui.visuals().weak_text_color();
-                ui.label(egui::RichText::new(icons::IMAGE).size(13.0).color(weak)).on_hover_text(tr("Taille des miniatures"));
-                ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false)).on_hover_text(tr("Taille des miniatures"));
-                ui.label(egui::RichText::new(icons::IMAGE).size(18.0).color(weak));
-                ui.end_row();
-                // dossiers en pastilles (ou une liste s'il y en a beaucoup), favoris
+                    open_dir = pill(ui, icons::FOLDER_OPEN, tr("Ouvrir le dossier")).on_hover_text(tr("Ouvrir le dossier des captures dans l'Explorateur")).clicked();
+                    refresh = pill(ui, icons::REFRESH, tr("Actualiser")).clicked();
+                },
+            );
+            // ligne 2 : dossiers en pastilles (ou une liste s'il y en a beaucoup), favoris
+            ui.horizontal_wrapped(|ui| {
                 if folders.len() <= 6 {
                     if chip(ui, self.folder.is_empty(), "", tr("Tous les dossiers")).clicked() {
                         self.folder.clear();
@@ -120,33 +141,25 @@ impl App {
                 if fav_chip(ui, self.favs_only, tr("Favoris")).clicked() {
                     self.favs_only = !self.favs_only;
                 }
-                ui.add_space(10.0);
-                // tout sélectionner (ou tout désélectionner si tout est déjà sélectionné)
-                if all_picked {
-                    if pill(ui, icons::DESELECT, tr("Tout désélectionner")).clicked() {
-                        self.sel.clear();
-                    }
-                } else if ui
-                    .add_enabled_ui(!vis.is_empty(), |ui| pill(ui, icons::SELECT_ALL, tr("Tout sélectionner")))
-                    .inner
-                    .on_hover_text(tr("Sélectionner toutes les captures affichées (Ctrl+A)"))
-                    .clicked()
-                {
-                    self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect();
-                }
-                // dossier des captures (ou le sous-dossier filtré) dans l'Explorateur
-                if pill(ui, icons::FOLDER_OPEN, tr("Ouvrir le dossier")).on_hover_text(tr("Ouvrir le dossier des captures dans l'Explorateur")).clicked() {
-                    let root = Path::new(&self.cfg.save_dir);
-                    let dir = if self.folder.is_empty() { root.to_path_buf() } else { root.join(&self.folder) };
-                    let dir = if dir.is_dir() { dir } else { root.to_path_buf() };
-                    let _ = std::fs::create_dir_all(&dir);
-                    let _ = Command::new("explorer").arg(&dir).spawn();
-                }
-                if pill(ui, icons::REFRESH, tr("Actualiser")).clicked() {
-                    self.items = list_items(&self.cfg.save_dir);
-                }
             });
         });
+        if deselect {
+            self.sel.clear();
+        }
+        if select_all {
+            self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect();
+        }
+        if open_dir {
+            // dossier des captures (ou le sous-dossier filtré) dans l'Explorateur
+            let root = Path::new(&self.cfg.save_dir);
+            let dir = if self.folder.is_empty() { root.to_path_buf() } else { root.join(&self.folder) };
+            let dir = if dir.is_dir() { dir } else { root.to_path_buf() };
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = Command::new("explorer").arg(&dir).spawn();
+        }
+        if refresh {
+            self.items = list_items(&self.cfg.save_dir);
+        }
         ui.add_space(4.0);
 
         // nouveau filtre, nouvelle recherche ou nouveau tri : les miniatures réapparaissent en cascade
