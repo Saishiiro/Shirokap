@@ -201,6 +201,17 @@ impl Zoom {
 
     /// Petite barre flottante en bas de la zone : − · pourcentage · + · ajuster.
     /// Elle apparaît quand la souris bouge au-dessus de l'image et s'efface ensuite.
+    /// Les contrôles flottants sont-ils affichés (souris bougée il y a peu) ? Les autres pilules
+    /// flottantes de la visionneuse (diaporama) suivent le même rythme.
+    pub fn awake(&self, ui: &egui::Ui) -> bool {
+        ui.input(|i| i.time) - self.last_move < 2.2
+    }
+
+    /// Affiche les contrôles flottants (comme si la souris venait de bouger).
+    pub fn wake(&mut self, ui: &egui::Ui) {
+        self.last_move = ui.input(|i| i.time);
+    }
+
     fn bar_rect(area: Rect) -> Rect {
         let size = vec2(300.0, 42.0);
         Rect::from_center_size(pos2(area.center().x, area.max.y - 18.0 - size.y / 2.0), size)

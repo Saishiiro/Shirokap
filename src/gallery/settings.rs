@@ -118,6 +118,7 @@ impl App {
                 c.theme = d.theme;
                 c.accent = d.accent;
                 c.accent_auto = d.accent_auto;
+                c.slide_secs = d.slide_secs;
                 c.tray_menu = d.tray_menu;
             }
             SetCat::Privacy => c.blocklist = d.blocklist,
@@ -458,6 +459,17 @@ impl App {
                     }
                 });
             });
+        });
+        group(ui, tr("Visionneuse"), |ui, rows| {
+            row(
+                ui,
+                rows,
+                tr("Durée de chaque image du diaporama"),
+                tr("Temps d'affichage d'une capture avant de passer à la suivante (Espace lance le diaporama dans la visionneuse). L'ordre se choisit dans le menu « Plus… » de la visionneuse."),
+                |ui| {
+                    stepper(ui, "slide", &mut c.slide_secs, 1..=60, 1, "s");
+                },
+            );
         });
         group(ui, tr("Menu de l'icône du tray"), |ui, rows| {
             row(

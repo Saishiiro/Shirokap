@@ -58,6 +58,7 @@ pub struct Config {
     pub accent_auto: bool,      // vrai : l'accent suit le thème (couleur propre à chaque thème)
     pub tray_menu: String,      // "modern" (menu dessiné par l'appli) | "native" (menu Windows)
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
+    pub slide_secs: u32,        // durée d'affichage de chaque image du diaporama (secondes)
 }
 
 /// Mode économie d'énergie de Windows 11 (« EcoQoS ») : quand il est actif, Windows fait tourner le
@@ -154,6 +155,7 @@ impl Default for Config {
             accent_auto: true,
             tray_menu: "modern".into(),
             language: "auto".into(),
+            slide_secs: 3,
         }
     }
 }

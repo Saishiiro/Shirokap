@@ -429,13 +429,16 @@ impl App {
         if k.6 || toggle_show {
             self.slideshow = !self.slideshow;
             self.slide_at = Instant::now();
+            self.zoom.wake(ui); // la pilule du diaporama se montre un instant
             if self.slideshow && !self.fullscreen {
                 self.status = ic(icons::PLAY, &trf("Diaporama : {0}", &[&self.slide_label()]));
             }
         }
         if self.slideshow {
-            ctx.request_repaint_after(Duration::from_millis(100));
-            if self.slide_at.elapsed() >= Duration::from_secs(3) {
+            // la barre de progression a besoin d'images régulières ; cachée, on attend juste l'image suivante
+            let left = Duration::from_secs(self.cfg.slide_secs.max(1) as u64).saturating_sub(self.slide_at.elapsed());
+            ctx.request_repaint_after(if self.zoom.awake(ui) { Duration::from_millis(100) } else { left });
+            if self.slide_at.elapsed() >= Duration::from_secs(self.cfg.slide_secs.max(1) as u64) {
                 self.slide_at = Instant::now();
                 self.view = Some(self.slide_next(vis, v));
                 self.view_dir = 1.0;
@@ -512,8 +515,8 @@ impl App {
             }
             // diaporama en cours : petite pilule en haut, avec le temps restant avant l'image suivante
             if self.slideshow {
-                let frac = (self.slide_at.elapsed().as_secs_f32() / 3.0).min(1.0);
-                if slide_pill(ui, area, frac).clicked() {
+                let frac = (self.slide_at.elapsed().as_secs_f32() / self.cfg.slide_secs.max(1) as f32).min(1.0);
+                if slide_pill(ui, area, frac, &mut self.zoom).clicked() {
                     self.slideshow = false;
                 }
             }
@@ -562,17 +565,28 @@ fn nav_button(ui: &mut egui::Ui, id: egui::Id, center: Pos2, icon: &str, k: f32)
 }
 
 /// Pilule « Diaporama » en haut de l'image : barre de progression jusqu'à l'image suivante ; un clic l'arrête.
-fn slide_pill(ui: &mut egui::Ui, area: Rect, frac: f32) -> egui::Response {
+/// Comme la barre de zoom, elle n'apparaît que quand la souris bouge, puis s'efface.
+fn slide_pill(ui: &mut egui::Ui, area: Rect, frac: f32, zoom: &mut crate::zoom::Zoom) -> egui::Response {
     let v = ui.visuals().clone();
     let label = ic(icons::PAUSE, tr("Diaporama · clic ou Espace : arrêter"));
     let g = ui.painter().layout_no_wrap(label, FontId::proportional(13.0), v.text_color());
     let size = vec2(g.size().x + 32.0, 34.0);
     let r = Rect::from_center_size(pos2(area.center().x, area.min.y + 18.0 + size.y / 2.0), size);
-    let resp = ui.interact(r, egui::Id::new("slide_pill"), Sense::click());
-    if resp.hovered() {
+    if ui.rect_contains_pointer(r.expand(12.0)) {
+        zoom.wake(ui); // tant que la souris est dessus, elle reste là
+    }
+    let k = ui.ctx().animate_bool_with_time_and_easing(egui::Id::new("slide_pill_k"), zoom.awake(ui), 0.3, egui::emath::easing::cubic_out);
+    let resp = ui.interact(r, egui::Id::new("slide_pill"), if k > 0.5 { Sense::click() } else { Sense::hover() });
+    if k < 0.02 {
+        return resp;
+    }
+    if resp.hovered() && k > 0.5 {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    let p = ui.painter_at(area);
+    // elle remonte en s'effaçant (la barre de zoom, elle, descend)
+    let r = r.translate(vec2(0.0, -12.0 * (1.0 - k)));
+    let mut p = ui.painter_at(area);
+    p.multiply_opacity(k);
     let shadow = egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 16.0, spread: 0.0, color: Color32::from_black_alpha(90) };
     p.add(shadow.as_shape(r, 17.0));
     p.rect_filled(r, 17.0, v.window_fill.gamma_multiply(0.96));

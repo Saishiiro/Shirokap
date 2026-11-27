@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 397] = [
+pub static TABLE: [[&str; 5]; 400] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -400,4 +400,7 @@ pub static TABLE: [[&str; 5]; 397] = [
     ["En pause", "Paused", "En pausa", "Pausiert", "已暂停"],
     ["Zone", "Region", "Zona", "Bereich", "区域"],
     ["Écran", "Screen", "Pantalla", "Bildschirm", "屏幕"],
+    ["Visionneuse", "Viewer", "Visor", "Bildbetrachter", "查看器"],
+    ["Durée de chaque image du diaporama", "Time per image in the slideshow", "Duración de cada imagen en la presentación", "Anzeigedauer pro Bild in der Diashow", "幻灯片每张图片的显示时间"],
+    ["Temps d'affichage d'une capture avant de passer à la suivante (Espace lance le diaporama dans la visionneuse). L'ordre se choisit dans le menu « Plus… » de la visionneuse.", "How long a screenshot stays on screen before the next one (Space starts the slideshow in the viewer). The order is set in the viewer's “More…” menu.", "Tiempo que se muestra una captura antes de pasar a la siguiente (Espacio inicia la presentación en el visor). El orden se elige en el menú «Más…» del visor.", "Wie lange eine Aufnahme angezeigt wird, bevor die nächste kommt (Leertaste startet die Diashow im Bildbetrachter). Die Reihenfolge legst du im Menü „Mehr…“ des Bildbetrachters fest.", "每张截图显示多久后切换到下一张（在查看器中按空格开始幻灯片）。顺序可在查看器的“更多…”菜单中选择。"],
 ];
