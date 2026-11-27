@@ -85,7 +85,7 @@ Requirements: Windows 10/11, [Rust](https://rustup.rs) and the Visual Studio "Bu
 build.bat
 ```
 
-The script builds in release mode and places `shirokap.exe` at the project root. The executable is standalone: it needs no extra DLL.
+The script builds in release mode and places `shirokap.exe` at the project root. The executable is standalone: it needs no extra DLL. It also replaces the paths of your PC (your user folder, and so your Windows user name) that would otherwise be written into the executable.
 
 Without installing Rust, the GitHub Actions workflow (`.github/workflows/build.yml`) builds the executable and the installer on GitHub's servers (*Actions* tab, then *Artifacts*).
 
@@ -238,7 +238,8 @@ build.bat
 ```
 
 Le script compile en mode release et dépose `shirokap.exe` à la racine du projet. L'exécutable est autonome :
-il n'a besoin d'aucune DLL supplémentaire.
+il n'a besoin d'aucune DLL supplémentaire. Il remplace aussi les chemins de ton PC (ton dossier utilisateur, et donc ton nom de session Windows) qui
+seraient sinon écrits dans l'exécutable.
 
 Sans installer Rust, le workflow GitHub Actions (`.github/workflows/build.yml`) compile l'exécutable et l'installateur
 sur les serveurs de GitHub (onglet *Actions*, puis *Artifacts*).

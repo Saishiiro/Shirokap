@@ -33,7 +33,11 @@ fi
 
 # 2. Compilation de l'exe Windows
 echo "== Compilation (cela peut prendre quelques minutes la première fois) =="
-cargo build --release --target "$TARGET"
+# les chemins de ce PC (dossier personnel, donc le nom d'utilisateur) ne doivent pas rester dans l'exe
+REMAP="'--remap-path-prefix=$HOME=~'"
+[[ -n "${CARGO_HOME:-}" ]] && REMAP="$REMAP,'--remap-path-prefix=$CARGO_HOME=cargo'"
+REMAP="$REMAP,'--remap-path-prefix=$PWD=shirokap'"
+cargo build --release --target "$TARGET" --config "target.'cfg(windows)'.rustflags=[$REMAP]"
 EXE="target/$TARGET/release/shirokap.exe"
 [[ -f "$EXE" ]] || fail "$EXE n'a pas été créé"
 
