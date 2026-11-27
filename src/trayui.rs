@@ -9,12 +9,12 @@ use std::time::{Duration, Instant};
 use windows_sys::Win32::{
     Foundation::{POINT, RECT},
     Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST},
-    UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow, SetWindowPos, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW},
+    UI::WindowsAndMessaging::{FindWindowW, SetForegroundWindow, SetWindowPos, SWP_NOZORDER, SWP_SHOWWINDOW},
 };
 
 const MARGIN: f32 = 14.0; // espace transparent autour des cartes (ombre)
-const CARD_W: f32 = 310.0;
-const FLY_W: f32 = 390.0; // largeur du sous-menu
+const CARD_W: f32 = 290.0; // largeurs minimales ; elles s'élargissent selon les textes (langue, raccourcis)
+const FLY_W: f32 = 300.0; // largeur du sous-menu
 const GAP: f32 = 8.0;
 const PAD: f32 = 8.0;
 const ROW_H: f32 = 34.0;
@@ -34,6 +34,33 @@ fn item_h(it: &It) -> f32 {
         It::Sep => SEP_H,
         _ => ROW_H,
     }
+}
+
+/// Largeur dont une carte a besoin pour afficher tous ses libellés en entier (mesurée avec les vraies polices).
+fn card_need_w(ctx: &egui::Context, items: &[It]) -> f32 {
+    let has_check = items.iter().any(|i| matches!(i, It::Act { checked: Some(_), .. }));
+    let has_icon = items.iter().any(|i| matches!(i, It::Act { icon, .. } | It::Sub { icon, .. } if !icon.is_empty()));
+    let gutter = if has_icon { 42.0 } else if has_check { 32.0 } else { 14.0 };
+    let w = |t: &str, size: f32| ctx.fonts(|f| f.layout_no_wrap(t.to_owned(), FontId::proportional(size), Color32::WHITE).size().x);
+    let row = items
+        .iter()
+        .map(|it| match it {
+            It::Sep => 0.0,
+            It::Info(t) => 14.0 + w(t, 12.5) + 12.0,
+            It::Act { icon, label, hint, checked } => {
+                let right = if !hint.is_empty() {
+                    w(hint, 12.0) + 12.0 + 14.0
+                } else if *checked == Some(true) && !icon.is_empty() {
+                    30.0
+                } else {
+                    12.0
+                };
+                gutter + w(label, 14.5) + right
+            }
+            It::Sub { label, .. } => gutter + w(label, 14.5) + 30.0,
+        })
+        .fold(0.0_f32, f32::max);
+    (row + 2.0 * PAD + 6.0).ceil()
 }
 
 fn card_h(items: &[It]) -> f32 {
@@ -228,6 +255,8 @@ struct Popup {
     acc: Color32,
     pos: (i32, i32),
     win: (f32, f32),
+    card_w: f32,
+    fly_w: f32,
     placed: bool,
     start: Instant,
     had_focus: bool,
@@ -266,6 +295,8 @@ pub fn run(x: i32, y: i32, paused: bool, auto: bool) {
                 acc: accent(&cfg),
                 pos: (x, y),
                 win,
+                card_w: CARD_W,
+                fly_w: FLY_W,
                 placed: false,
                 start: Instant::now(),
                 had_focus: false,
@@ -306,7 +337,7 @@ impl Popup {
         unsafe {
             let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
             if !hwnd.is_null() {
-                SetWindowPos(hwnd, std::ptr::null_mut(), x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                SetWindowPos(hwnd, std::ptr::null_mut(), x, y, w, h, SWP_NOZORDER | SWP_SHOWWINDOW);
                 SetForegroundWindow(hwnd);
             }
         }
@@ -321,6 +352,14 @@ impl eframe::App for Popup {
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
         if !self.placed {
             self.placed = true;
+            // largeurs des cartes selon leurs textes : la fenêtre prend la taille voulue au moment d'être placée
+            self.card_w = card_need_w(ctx, &self.items).max(CARD_W);
+            self.fly_w = self
+                .items
+                .iter()
+                .filter_map(|i| if let It::Sub { kids, .. } = i { Some(card_need_w(ctx, kids)) } else { None })
+                .fold(FLY_W, f32::max);
+            self.win.0 = MARGIN * 2.0 + self.fly_w + GAP + self.card_w;
             self.place(ctx);
             ctx.request_repaint();
             return; // rien n'est dessiné avant le placement (pas de clignotement)
@@ -342,7 +381,7 @@ impl eframe::App for Popup {
         egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |ui| {
             let full = ui.max_rect();
             let main_h = card_h(&self.items);
-            let main = Rect::from_min_size(pos2(full.max.x - MARGIN - CARD_W, full.max.y - MARGIN - main_h), vec2(CARD_W, main_h));
+            let main = Rect::from_min_size(pos2(full.max.x - MARGIN - self.card_w, full.max.y - MARGIN - main_h), vec2(self.card_w, main_h));
             let hover = ctx.input(|i| i.pointer.hover_pos());
             let mut out = Out::default();
             draw_card(ui, &self.pal, self.acc, main, &self.items, "main", self.open_sub, &mut out);
@@ -363,7 +402,7 @@ impl eframe::App for Popup {
                     let row_y = main.min.y + PAD + self.items[..n].iter().map(item_h).sum::<f32>();
                     let fh = card_h(kids);
                     let top = (row_y - PAD).clamp(full.min.y + MARGIN, (full.max.y - MARGIN - fh).max(full.min.y + MARGIN));
-                    let fr = Rect::from_min_size(pos2(main.min.x - GAP - FLY_W, top), vec2(FLY_W, fh));
+                    let fr = Rect::from_min_size(pos2(main.min.x - GAP - self.fly_w, top), vec2(self.fly_w, fh));
                     draw_card(ui, &self.pal, self.acc, fr, kids, &format!("fly{n}"), None, &mut out);
                     self.fly_rect = Some(fr);
                 }
