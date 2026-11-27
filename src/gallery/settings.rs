@@ -578,12 +578,102 @@ impl App {
         });
         group(ui, tr("À propos"), |ui, rows| {
             let title = format!("Shirokap {}", env!("CARGO_PKG_VERSION"));
-            row(ui, rows, &title, tr("Police Inter © Rasmus Andersson, licence SIL Open Font License (voir assets/fonts/LICENSE-Inter.txt)."), |ui| {
+            row(ui, rows, &title, tr("© 2026 Saishiiro · logiciel libre sous licence GPL-3.0, fourni sans aucune garantie."), |ui| {
                 if pill(ui, icons::SPARKLES, tr("Revoir l'écran d'accueil")).clicked() {
                     self.show_welcome = true;
                 }
             });
+            row(ui, rows, tr("Code source"), REPO_URL.trim_start_matches("https://"), |ui| {
+                if pill(ui, icons::EXTERNAL, tr("Ouvrir sur GitHub")).clicked() {
+                    let _ = Command::new("explorer").arg(REPO_URL).spawn();
+                }
+            });
+            row(
+                ui,
+                rows,
+                tr("Licences"),
+                tr("Police Inter © Rasmus Andersson (SIL Open Font License 1.1) · icônes Lucide © Lucide Icons and Contributors (licence ISC)."),
+                |ui| {
+                    if pill(ui, icons::LICENSE, tr("Voir les licences")).clicked() {
+                        self.show_licenses = true;
+                    }
+                },
+            );
         });
         self.reset_row(ui, SetCat::System);
     }
+
+    /// Fenêtre « Licences » : le texte complet de la licence de Shirokap (GPL-3.0) et de celles de la
+    /// police Inter et des icônes Lucide, intégrés à l'exe (la version portable n'a pas d'autres fichiers).
+    pub(super) fn licenses_ui(&mut self, ctx: &egui::Context) {
+        let k = ctx.animate_bool_with_time_and_easing(egui::Id::new("licenses_k"), self.show_licenses, 0.25, egui::emath::easing::cubic_out);
+        if k < 0.01 {
+            return;
+        }
+        let screen = ctx.screen_rect();
+        let mut close = false;
+        egui::Area::new(egui::Id::new("licenses_dim")).order(egui::Order::Middle).fixed_pos(screen.min).show(ctx, |ui| {
+            let (_, r) = ui.allocate_exact_size(screen.size(), Sense::click());
+            ui.painter().rect_filled(screen, 0.0, Color32::from_black_alpha((120.0 * k) as u8));
+            if r.clicked() {
+                close = true;
+            }
+        });
+        let w = 720.0_f32.min(screen.width() - 60.0);
+        let h = 640.0_f32.min(screen.height() - 80.0);
+        egui::Area::new(egui::Id::new("licenses_card"))
+            .order(egui::Order::Foreground)
+            .anchor(Align2::CENTER_CENTER, vec2(0.0, 14.0 * (1.0 - k)))
+            .interactable(self.show_licenses)
+            .show(ctx, |ui| {
+                ui.multiply_opacity(k);
+                let dark = ui.visuals().dark_mode;
+                egui::Frame::none()
+                    .fill(ui.visuals().window_fill)
+                    .rounding(20.0)
+                    .stroke(Stroke::new(1.0_f32, ui.visuals().widgets.noninteractive.bg_stroke.color))
+                    .shadow(egui::epaint::Shadow { offset: vec2(0.0, 14.0), blur: 44.0, spread: 0.0, color: Color32::from_black_alpha(if dark { 160 } else { 60 }) })
+                    .inner_margin(egui::Margin::same(22.0))
+                    .show(ui, |ui| {
+                        ui.set_width(w - 44.0);
+                        ui.set_height(h - 44.0);
+                        ui.horizontal(|ui| {
+                            ui.label(bold_text(&ic(icons::LICENSE, tr("Licences")), 18.0));
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ghost(ui, icons::CLOSE, tr("Fermer")).clicked() {
+                                    close = true;
+                                }
+                            });
+                        });
+                        ui.add_space(8.0);
+                        segmented(
+                            ui,
+                            &mut self.license_tab,
+                            &[(0, "Shirokap · GPL-3.0"), (1, "Inter · OFL 1.1"), (2, "Lucide · ISC")],
+                        );
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(tr("Textes officiels, en anglais.")).size(12.5).color(ui.visuals().weak_text_color()));
+                        ui.add_space(6.0);
+                        let text = match self.license_tab {
+                            1 => include_str!("../../assets/fonts/LICENSE-Inter.txt"),
+                            2 => include_str!("../../assets/fonts/LICENSE-Lucide.txt"),
+                            _ => include_str!("../../LICENSE"),
+                        };
+                        egui::Frame::none().fill(ui.visuals().extreme_bg_color).rounding(12.0).inner_margin(egui::Margin::same(14.0)).show(ui, |ui| {
+                            egui::ScrollArea::vertical().id_salt(("licenses_text", self.license_tab)).auto_shrink([false, false]).show(ui, |ui| {
+                                ui.label(egui::RichText::new(text).monospace().size(12.5));
+                            });
+                        });
+                    });
+            });
+        if self.show_licenses && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            close = true;
+        }
+        if close {
+            self.show_licenses = false;
+        }
+    }
 }
+
+/// Dépôt du code source.
+const REPO_URL: &str = "https://github.com/Saishiiro/Shirokap";

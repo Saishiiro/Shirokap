@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 404] = [
+pub static TABLE: [[&str; 5]; 412] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -407,4 +407,12 @@ pub static TABLE: [[&str; 5]; 404] = [
     ["{0} capture(s) sélectionnée(s) vont partir dans la corbeille.", "{0} selected screenshot(s) will go to the Recycle Bin.", "{0} captura(s) seleccionada(s) irán a la papelera.", "{0} ausgewählte Aufnahme(n) werden in den Papierkorb verschoben.", "{0} 张选中的截图将被移到回收站。"],
     ["Tu pourras les récupérer depuis la corbeille de Windows, ou avec « Annuler » dans la notification.", "You can get them back from the Windows Recycle Bin, or with “Undo” in the notification.", "Podrás recuperarlas desde la papelera de Windows o con «Deshacer» en la notificación.", "Du kannst sie aus dem Windows-Papierkorb oder mit „Rückgängig“ in der Benachrichtigung zurückholen.", "可以从 Windows 回收站中恢复，或点击通知中的“撤销”。"],
     ["« {0} » va partir dans la corbeille.", "“{0}” will go to the Recycle Bin.", "«{0}» irá a la papelera.", "„{0}“ wird in den Papierkorb verschoben.", "“{0}”将被移到回收站。"],
+    ["© 2026 Saishiiro · logiciel libre sous licence GPL-3.0, fourni sans aucune garantie.", "© 2026 Saishiiro · free software under the GPL-3.0 license, provided without any warranty.", "© 2026 Saishiiro · software libre bajo licencia GPL-3.0, sin ninguna garantía.", "© 2026 Saishiiro · freie Software unter der GPL-3.0-Lizenz, ohne jede Gewährleistung.", "© 2026 Saishiiro · 基于 GPL-3.0 许可的自由软件，不提供任何担保。"],
+    ["Code source", "Source code", "Código fuente", "Quellcode", "源代码"],
+    ["Ouvrir sur GitHub", "Open on GitHub", "Abrir en GitHub", "Auf GitHub öffnen", "在 GitHub 上打开"],
+    ["Licences", "Licenses", "Licencias", "Lizenzen", "许可证"],
+    ["Police Inter © Rasmus Andersson (SIL Open Font License 1.1) · icônes Lucide © Lucide Icons and Contributors (licence ISC).", "Inter font © Rasmus Andersson (SIL Open Font License 1.1) · Lucide icons © Lucide Icons and Contributors (ISC license).", "Fuente Inter © Rasmus Andersson (SIL Open Font License 1.1) · iconos Lucide © Lucide Icons and Contributors (licencia ISC).", "Schrift Inter © Rasmus Andersson (SIL Open Font License 1.1) · Lucide-Symbole © Lucide Icons and Contributors (ISC-Lizenz).", "Inter 字体 © Rasmus Andersson（SIL Open Font License 1.1）· Lucide 图标 © Lucide Icons and Contributors（ISC 许可）。"],
+    ["Voir les licences", "View licenses", "Ver licencias", "Lizenzen anzeigen", "查看许可证"],
+    ["Fermer", "Close", "Cerrar", "Schließen", "关闭"],
+    ["Textes officiels, en anglais.", "Official texts, in English.", "Textos oficiales, en inglés.", "Offizielle Texte, auf Englisch.", "官方文本（英文）。"],
 ];

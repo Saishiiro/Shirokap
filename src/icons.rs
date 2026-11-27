@@ -95,3 +95,5 @@ pub const FLASH: &str = "\u{f758}"; // zap
 pub const FOLDER_TREE: &str = "\u{f759}"; // folder-tree
 pub const REPLACE: &str = "\u{f75a}"; // replace
 pub const MONITOR: &str = "\u{f75b}"; // monitor
+pub const LICENSE: &str = "\u{f75c}"; // scale
+pub const CODE: &str = "\u{f75d}"; // code-xml

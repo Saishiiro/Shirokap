@@ -142,6 +142,8 @@ struct App {
     sidebar_open: bool,
     set_cat: SetCat,
     show_welcome: bool,
+    show_licenses: bool, // fenêtre « Licences » (Paramètres > Système > À propos)
+    license_tab: usize,  // licence affichée : 0 Shirokap, 1 Inter, 2 Lucide
     shown_tab: Tab,      // onglet affiché à l'image précédente
     tab_at: Instant,     // moment du dernier changement d'onglet (pour le fondu)
     grid_sig: u64,       // filtres de la grille (dossier, recherche, tri…) à l'image précédente
@@ -251,6 +253,8 @@ impl App {
             sidebar_open: ui_state.sidebar,
             set_cat: SetCat::Shortcuts,
             show_welcome: !ui_state.welcomed,
+            show_licenses: false,
+            license_tab: 0,
             shown_tab: Tab::Gallery,
             tab_at: Instant::now() - Duration::from_secs(1),
             grid_sig: 0,
@@ -702,6 +706,7 @@ impl eframe::App for App {
         }
         // écran d'accueil (au premier lancement, ou via Paramètres > Système)
         self.welcome_ui(ctx);
+        self.licenses_ui(ctx);
         if let Some(idx) = self.recording {
             ctx.request_repaint(); // on lit le clavier en continu pendant l'enregistrement
             match poll_hotkey() {

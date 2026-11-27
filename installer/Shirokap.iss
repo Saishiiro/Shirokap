@@ -43,7 +43,9 @@ Name: "desktopicon"; Description: "{cm:DesktopIcon}"; Flags: unchecked
 
 [Files]
 Source: "..\shirokap.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "..\assets\fonts\LICENSE-Inter.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\assets\fonts\LICENSE-Lucide.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\Shirokap"; Filename: "{app}\shirokap.exe"
