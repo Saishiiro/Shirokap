@@ -523,7 +523,8 @@ fn shape_glyph(p: &egui::Painter, r: Rect, kind: ShapeKind, color: Color32) {
 
 /// Ligne du menu « Formes » : vignette de la forme, son nom, une coche si elle est choisie.
 fn shape_row(ui: &mut egui::Ui, w: f32, selected: bool, kind: ShapeKind, label: &str) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(w, 34.0), Sense::click());
+    // toute la largeur du menu (qui peut être plus large que `w`, par exemple sous un bouton plus long)
+    let (rect, resp) = ui.allocate_at_least(vec2(w, 34.0), Sense::click());
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
