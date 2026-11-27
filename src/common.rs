@@ -88,6 +88,7 @@ pub fn set_efficiency(on: bool) {
 /// Couleur d'accent propre à chaque thème (mode « Auto »).
 pub fn theme_accent(theme: &str) -> [u8; 3] {
     match theme {
+        "shirokap" => [255, 255, 255], // blanc, comme le losange du logo
         "graphite" => [20, 184, 166],
         "midnight" => [99, 132, 255],
         "oled" => [34, 211, 238],

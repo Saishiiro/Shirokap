@@ -74,7 +74,8 @@ pub(crate) struct Pal {
     pub(crate) text: Color32,
 }
 
-pub(crate) const THEMES: [(&str, &str); 17] = [
+pub(crate) const THEMES: [(&str, &str); 18] = [
+    ("shirokap", "Shirokap"),
     ("dark", "Sombre"),
     ("graphite", "Graphite"),
     ("midnight", "Minuit"),
@@ -125,6 +126,8 @@ pub(crate) fn palette(theme: &str) -> Pal {
         text: col(text[0], text[1], text[2]),
     };
     match theme {
+        // aux couleurs du logo : panneaux mauves, texte et couleur d'accent blancs
+        "shirokap" => mk(true, [98, 78, 182], [84, 66, 160], [112, 92, 196], [84, 66, 160], [124, 104, 206], [138, 118, 216], [118, 98, 200], [150, 132, 224], [196, 184, 244], [255, 255, 255]),
         "graphite" => mk(true, [30, 30, 30], [23, 23, 23], [38, 38, 38], [24, 24, 24], [50, 50, 50], [62, 62, 62], [56, 56, 56], [74, 74, 74], [104, 104, 104], [230, 230, 230]),
         "midnight" => mk(true, [15, 20, 36], [10, 14, 26], [22, 29, 50], [10, 14, 26], [31, 41, 70], [42, 54, 88], [36, 47, 78], [54, 68, 108], [82, 100, 150], [226, 232, 246]),
         "oled" => mk(true, [0, 0, 0], [8, 8, 9], [16, 16, 18], [10, 10, 12], [28, 28, 32], [40, 40, 44], [36, 36, 40], [58, 58, 64], [90, 90, 98], [236, 236, 238]),
@@ -257,14 +260,19 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     v.window_shadow = egui::epaint::Shadow { offset: vec2(0.0, 10.0), blur: 32.0, spread: 0.0, color: Color32::from_black_alpha(sh) };
     v.popup_shadow = egui::epaint::Shadow { offset: vec2(0.0, 6.0), blur: 20.0, spread: 0.0, color: Color32::from_black_alpha(sh * 3 / 4) };
     v.menu_rounding = Rounding::same(12.0);
-    v.selection.bg_fill = acc;
-    v.selection.stroke = Stroke::new(1.0_f32, on_accent(acc));
+    // la couleur d'accent de nos widgets est lue dans `hyperlink_color` (voir `accent_of`) ; egui, lui, utilise
+    // `selection` pour surligner le texte sélectionné et les options choisies, toujours en texte du thème :
+    // une couleur d'accent très claire (le blanc du thème Shirokap) y est fondue dans le fond pour rester lisible
+    let lum = 0.299 * acc.r() as f32 + 0.587 * acc.g() as f32 + 0.114 * acc.b() as f32;
+    let sel = if pal.dark && lum > 190.0 { acc.lerp_to_gamma(bg, 0.72) } else { acc };
+    v.selection.bg_fill = sel;
+    v.selection.stroke = Stroke::new(1.0_f32, on_accent(sel));
     v.hyperlink_color = acc;
     let round = Rounding::same(12.0);
     for (w, fill) in [
         (&mut v.widgets.inactive, button),
         (&mut v.widgets.hovered, hover),
-        (&mut v.widgets.active, acc),
+        (&mut v.widgets.active, sel),
         (&mut v.widgets.open, hover),
     ] {
         w.bg_fill = fill;
@@ -278,7 +286,7 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, line.lerp_to_gamma(s_in, 0.5));
     v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, s_hov);
     v.slider_trailing_fill = true;
-    v.widgets.active.fg_stroke = Stroke::new(1.5_f32, on_accent(acc));
+    v.widgets.active.fg_stroke = Stroke::new(1.5_f32, on_accent(sel));
     v.widgets.noninteractive.bg_fill = bg;
     v.widgets.noninteractive.weak_bg_fill = bg;
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, line);
@@ -298,6 +306,11 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
         s.text_styles.insert(TextStyle::Small, FontId::proportional(12.5));
         s.text_styles.insert(TextStyle::Heading, FontId::new(22.0, egui::FontFamily::Name("bold".into())));
     });
+}
+
+/// Couleur d'accent du thème affiché (posée par `apply_style_with`).
+pub(crate) fn accent_of(v: &egui::Visuals) -> Color32 {
+    v.hyperlink_color
 }
 
 pub(crate) fn icon_check(p: &egui::Painter, c: Pos2, color: Color32) {
@@ -320,7 +333,7 @@ pub(crate) fn icon_button(ui: &mut egui::Ui, icon: &str, on: bool) -> egui::Resp
     let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("on"), on, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
-    let acc = v.selection.bg_fill;
+    let acc = accent_of(v);
     let p = ui.painter();
     if hk * (1.0 - sk) > 0.01 {
         p.rect_filled(rect, 20.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
@@ -371,7 +384,7 @@ pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab:
     let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
-    let acc = v.selection.bg_fill;
+    let acc = accent_of(v);
     let p = ui.painter();
     if hk * (1.0 - sk) > 0.01 {
         p.rect_filled(rect, 21.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
@@ -416,7 +429,7 @@ pub(crate) fn cat_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, cat:
     let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
-    let acc = v.selection.bg_fill;
+    let acc = accent_of(v);
     let dark = v.dark_mode;
     let p = ui.painter();
     let row = v.faint_bg_color;

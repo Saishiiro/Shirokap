@@ -64,7 +64,7 @@ impl App {
                     }
                     let (row, _) = ui.allocate_exact_size(vec2(480.0, 22.0), Sense::hover());
                     let txt = ui.visuals().text_color();
-                    let acc = ui.visuals().selection.bg_fill;
+                    let acc = accent_of(ui.visuals());
                     let track = ui.visuals().widgets.inactive.bg_fill;
                     let p = ui.painter();
                     p.text(row.left_center(), Align2::LEFT_CENTER, label, FontId::proportional(15.0), txt);

@@ -452,7 +452,7 @@ fn caret(p: &egui::Painter, x: f32, y: f32, h: f32) {
 /// Bouton de menu déroulant : coins arrondis, surligné quand il est actif, avec une petite flèche « v ».
 /// (`Button::selected` d'egui donne des coins carrés, d'où ce bouton maison.)
 pub fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&mut egui::Ui)) {
-    let acc = ui.visuals().selection.bg_fill;
+    let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
     // espaces insécables en fin de libellé : ils réservent la place de la flèche dessinée ensuite
     let txt = format!("{label}\u{00A0}\u{00A0}\u{00A0}\u{00A0}\u{00A0}");
     let mut btn = if active {
@@ -647,7 +647,7 @@ impl Editor {
                 copy_to_clipboard(&self.render());
                 self.status = format!("{}  {}", icons::COPY, tr("Copiée dans le presse-papiers"));
             }
-            let acc = ui.visuals().selection.bg_fill;
+            let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
             let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc))).fill(acc);
             if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
                 save = Some(false);

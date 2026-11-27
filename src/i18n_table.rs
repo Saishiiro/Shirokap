@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 337] = [
+pub static TABLE: [[&str; 5]; 338] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -340,4 +340,5 @@ pub static TABLE: [[&str; 5]; 337] = [
     ["Zoom : molette  ·  + et − par paliers  ·  0 ajuster  ·  1 taille réelle  ·  double-clic (visionneuse) : ajuster / taille réelle", "Zoom: wheel  ·  + and − in steps  ·  0 fit  ·  1 actual size  ·  double-click (viewer): fit / actual size", "Zoom: rueda  ·  + y − por pasos  ·  0 ajustar  ·  1 tamaño real  ·  doble clic (visor): ajustar / tamaño real", "Zoom: Mausrad  ·  + und − in Stufen  ·  0 einpassen  ·  1 Originalgröße  ·  Doppelklick (Ansicht): einpassen / Originalgröße", "缩放：滚轮  ·  + 和 − 逐级缩放  ·  0 适应窗口  ·  1 实际大小  ·  双击（查看器）：适应 / 实际大小"],
     ["Éditeur : Ctrl+Z annuler  ·  Ctrl+Y rétablir  ·  clic molette ou Espace + glisser : déplacer l'image", "Editor: Ctrl+Z undo  ·  Ctrl+Y redo  ·  middle-click or Space + drag: move the image", "Editor: Ctrl+Z deshacer  ·  Ctrl+Y rehacer  ·  clic central o Espacio + arrastrar: mover la imagen", "Editor: Strg+Z rückgängig  ·  Strg+Y wiederholen  ·  Mittelklick oder Leertaste + Ziehen: Bild verschieben", "编辑器：Ctrl+Z 撤销  ·  Ctrl+Y 重做  ·  中键或空格 + 拖动：移动图片"],
     ["Rechercher une commande…", "Search for a command…", "Buscar un comando…", "Befehl suchen…", "搜索命令…"],
+    ["Shirokap", "Shirokap", "Shirokap", "Shirokap", "Shirokap"],
 ];
