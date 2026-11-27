@@ -13,8 +13,8 @@ use windows_sys::Win32::{
 };
 
 const MARGIN: f32 = 14.0; // espace transparent autour des cartes (ombre)
-const CARD_W: f32 = 290.0;
-const FLY_W: f32 = 340.0; // largeur du sous-menu
+const CARD_W: f32 = 310.0;
+const FLY_W: f32 = 390.0; // largeur du sous-menu
 const GAP: f32 = 8.0;
 const PAD: f32 = 8.0;
 const ROW_H: f32 = 34.0;
@@ -130,6 +130,13 @@ struct Out {
     hover_plain: bool,
 }
 
+/// Texte sur une seule ligne, coupé avec « … » s'il dépasse `max_w` (il ne chevauche jamais le raccourci).
+fn fit(p: &egui::Painter, text: &str, font: FontId, color: Color32, max_w: f32) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+    job.wrap = egui::text::TextWrapping { max_width: max_w.max(20.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
+    p.layout_job(job)
+}
+
 fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It], salt: &str, active_sub: Option<usize>, out: &mut Out) {
     let p = ui.painter();
     let shadow = egui::epaint::Shadow { offset: vec2(0.0, 5.0), blur: 20.0, spread: 0.0, color: Color32::from_black_alpha(100) };
@@ -177,10 +184,16 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
                     p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
                     p.line_segment([c + vec2(-1.5, 3.5), c + vec2(4.5, -3.5)], st);
                 }
-                p.text(pos2(row.min.x + gutter, row.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), t);
+                // place laissée au libellé : jusqu'au raccourci (ou à la coche) à droite
+                let mut right = row.max.x - 12.0;
                 if !hint.is_empty() {
-                    p.text(pos2(row.max.x - 12.0, row.center().y), Align2::RIGHT_CENTER, hint, FontId::proportional(12.0), weak);
+                    let r = p.text(pos2(row.max.x - 12.0, row.center().y), Align2::RIGHT_CENTER, hint, FontId::proportional(12.0), weak);
+                    right = r.min.x - 14.0;
+                } else if on && !icon.is_empty() {
+                    right = row.max.x - 30.0;
                 }
+                let g = fit(p, label, FontId::proportional(14.5), t, right - (row.min.x + gutter));
+                p.galley(pos2(row.min.x + gutter, row.center().y - g.size().y / 2.0), g, t);
                 if resp.clicked() {
                     out.chosen = Some(id.clone());
                 }
@@ -197,7 +210,8 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, rect: Rect, items: &[It
                 if !icon.is_empty() {
                     p.text(pos2(row.min.x + 14.0, row.center().y), Align2::LEFT_CENTER, *icon, icon_font.clone(), t);
                 }
-                p.text(pos2(row.min.x + gutter, row.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), t);
+                let g = fit(p, label, FontId::proportional(14.5), t, row.max.x - 30.0 - (row.min.x + gutter));
+                p.galley(pos2(row.min.x + gutter, row.center().y - g.size().y / 2.0), g, t);
                 let c = pos2(row.max.x - 16.0, row.center().y);
                 let st = Stroke::new(1.7_f32, t);
                 p.line_segment([c + vec2(-2.5, -4.5), c + vec2(2.0, 0.0)], st);

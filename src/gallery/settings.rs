@@ -224,14 +224,16 @@ impl App {
         let c = &mut self.cfg;
         group(ui, tr("Enregistrement"), |ui, rows| {
             row_below(ui, rows, tr("Dossier des captures"), tr("Le dossier est créé automatiquement s'il n'existe pas."), |ui| {
+                // le bouton d'abord (calé à droite), puis le champ prend toute la place qui reste
                 ui.horizontal(|ui| {
-                    let w = (ui.available_width() - 140.0).max(160.0);
-                    field(ui, &mut c.save_dir, "", w);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if pill(ui, icons::FOLDER_OPEN, tr("Parcourir…")).clicked() {
                         if let Some(p) = rfd::FileDialog::new().pick_folder() {
                             c.save_dir = p.display().to_string();
                         }
                     }
+                    field(ui, &mut c.save_dir, "", ui.available_width());
+                });
                 });
             });
             row_below(ui, rows, tr("Nom des fichiers"), tr("Clique sur une variable pour l'ajouter au nom."), |ui| {
@@ -306,13 +308,14 @@ impl App {
         group(ui, tr("Éditeur externe"), |ui, rows| {
             row_below(ui, rows, tr("Programme d'édition"), tr("Utilisé par le bouton « Modifier dans l'éditeur externe » (Paint par défaut)."), |ui| {
                 ui.horizontal(|ui| {
-                    let w = (ui.available_width() - 140.0).max(160.0);
-                    field(ui, &mut c.editor, "mspaint", w);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if pill(ui, icons::FOLDER_OPEN, tr("Parcourir…")).clicked() {
                         if let Some(p) = rfd::FileDialog::new().add_filter("exe", &["exe"]).pick_file() {
                             c.editor = p.display().to_string();
                         }
                     }
+                    field(ui, &mut c.editor, "mspaint", ui.available_width());
+                });
                 });
             });
         });

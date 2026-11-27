@@ -146,7 +146,7 @@ impl Default for Config {
             jpg_quality: 90,
             png_level: 0,
             folder_per_window: false,
-            clipboard: true,
+            clipboard: false, // à activer dans les paramètres si on le souhaite
             sound: false,
             flash: true,
             theme: "dark".into(),
