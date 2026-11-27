@@ -61,7 +61,7 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 **Other**
 - Screenshot pinned on top of the screen, copy files to the clipboard, export the selection.
 - Launch with Windows, export/import of the configuration.
-- Light on resources: the tray process and the gallery in the background use Windows 11 efficiency mode.
+- Light on resources: the tray process and the gallery in the background ask Windows 11 to run them in its power-saving mode (EcoQoS). They keep their normal priority so that shortcuts stay instant, so Task Manager does not show its "Efficiency mode" leaf.
 
 ### Default hotkeys (editable in Settings > Shortcuts)
 
@@ -213,7 +213,7 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 **Autres**
 - Capture épinglée au premier plan de l'écran, copie des fichiers dans le presse-papiers, export de la sélection.
 - Lancement automatique avec Windows, export/import de la configuration.
-- Léger : le processus du tray et la galerie en arrière-plan utilisent le mode efficacité de Windows 11.
+- Léger : le processus du tray et la galerie en arrière-plan demandent à Windows 11 de les faire tourner en mode économie d'énergie (EcoQoS). Ils gardent leur priorité normale pour que les raccourcis restent instantanés : le gestionnaire des tâches n'affiche donc pas sa feuille « Mode efficacité ».
 
 ### Raccourcis par défaut (modifiables dans Paramètres > Raccourcis)
 

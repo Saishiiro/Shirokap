@@ -60,8 +60,10 @@ pub struct Config {
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
 }
 
-/// Mode efficacité de Windows 11 (la feuille verte du gestionnaire des tâches) : quand il est actif,
-/// Windows fait tourner le processus sur des cœurs moins rapides et plus économes (« EcoQoS »).
+/// Mode économie d'énergie de Windows 11 (« EcoQoS ») : quand il est actif, Windows fait tourner le
+/// processus sur des cœurs moins rapides et plus économes. La feuille « Mode efficacité » du gestionnaire
+/// des tâches n'apparaît pas : elle demande en plus une priorité basse, qu'on évite pour que le tray
+/// réagisse tout de suite aux raccourcis même quand un jeu occupe le processeur.
 /// Idéal pour ce qui travaille en arrière-plan ; sans effet (et sans erreur) sur les anciennes versions de Windows.
 pub fn set_efficiency(on: bool) {
     use windows_sys::Win32::System::Threading::{

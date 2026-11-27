@@ -31,7 +31,7 @@ A big visual update of the gallery: more modern, animated, with icons.
 - Shimmer while thumbnails load.
 
 **Performance**
-- Windows 11 efficiency mode for the tray process (except during a capture) and for the gallery in the background.
+- Windows 11 power-saving mode (EcoQoS) for the tray process (except during a capture) and for the gallery in the background. The priority stays normal, so Task Manager does not show its "Efficiency mode" leaf.
 - The list of displayed screenshots is cached instead of being recomputed every frame.
 
 ### 1.1.0 — November 2026
@@ -134,7 +134,7 @@ Une grosse mise à jour visuelle de la galerie : plus moderne, animée, avec des
 - Reflet animé pendant le chargement des miniatures.
 
 **Performances**
-- Mode efficacité de Windows 11 pour le processus du tray (sauf pendant une capture) et pour la galerie en arrière-plan.
+- Mode économie d'énergie de Windows 11 (EcoQoS) pour le processus du tray (sauf pendant une capture) et pour la galerie en arrière-plan. La priorité reste normale : le gestionnaire des tâches n'affiche donc pas sa feuille « Mode efficacité ».
 - La liste des captures affichées est gardée en mémoire au lieu d'être recalculée à chaque image.
 
 ### 1.1.0 — novembre 2026
