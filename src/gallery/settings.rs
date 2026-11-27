@@ -63,6 +63,8 @@ impl App {
         egui::Frame::none().inner_margin(pad).show(ui, |ui| {
             ui.multiply_opacity(k);
             egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+                // marge à droite pour la barre de défilement, qui flotte par-dessus le contenu
+                ui.set_max_width(ui.available_width() - 14.0);
                 match self.set_cat {
                     SetCat::Shortcuts => self.set_shortcuts(ui),
                     SetCat::Capture => self.set_capture(ui),
@@ -121,62 +123,68 @@ impl App {
         self.status = ic(icons::RESET, tr("Rubrique réinitialisée : pense à enregistrer"));
     }
 
+    /// Bouton discret en bas de chaque rubrique : remet seulement cette rubrique à zéro.
     pub(super) fn reset_row(&mut self, ui: &mut egui::Ui, cat: SetCat) {
-        ui.add_space(2.0);
-        if ui
-            .button(ic(icons::RESET, tr("Rétablir les valeurs par défaut de cette rubrique")))
+        if ghost(ui, icons::RESET, tr("Rétablir les valeurs par défaut de cette rubrique"))
             .on_hover_text(tr("Remet uniquement les réglages de cette page à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer »."))
             .clicked()
         {
             self.reset_cat(cat);
         }
-        ui.add_space(14.0);
+        ui.add_space(8.0);
     }
 
     pub(super) fn set_shortcuts(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Raccourcis"), tr("Des touches ou combinaisons qui fonctionnent partout dans Windows. Écris-les dans le champ, ou clique sur « Enregistrer » puis appuie sur les touches."));
-        card(ui, tr("Capture"), |ui| {
-            hotkey_row(ui, tr("Capture"), &mut self.cfg.hotkey, &mut self.recording, 0);
-            hotkey_row(ui, tr("Zone (sélection)"), &mut self.cfg.hotkey_region, &mut self.recording, 1);
-            hotkey_row(ui, tr("Fenêtre active"), &mut self.cfg.hotkey_window, &mut self.recording, 2);
-            hotkey_row(ui, tr("Dernière zone"), &mut self.cfg.hotkey_last_region, &mut self.recording, 3);
-            hotkey_row(ui, tr("Zone → presse-papiers"), &mut self.cfg.hotkey_region_clip, &mut self.recording, 5);
-            hotkey_row(ui, tr("Pipette (couleur)"), &mut self.cfg.hotkey_picker, &mut self.recording, 6);
+        page_head(ui, icons::KEYBOARD, tr("Raccourcis"), tr("Des touches ou combinaisons qui fonctionnent partout dans Windows. Écris-les dans le champ, ou clique sur « Enregistrer » puis appuie sur les touches."));
+        let rec = &mut self.recording;
+        let c = &mut self.cfg;
+        group(ui, tr("Capture"), |ui, rows| {
+            hotkey_row(ui, rows, tr("Capture"), &mut c.hotkey, rec, 0);
+            hotkey_row(ui, rows, tr("Zone (sélection)"), &mut c.hotkey_region, rec, 1);
+            hotkey_row(ui, rows, tr("Fenêtre active"), &mut c.hotkey_window, rec, 2);
+            hotkey_row(ui, rows, tr("Dernière zone"), &mut c.hotkey_last_region, rec, 3);
+            hotkey_row(ui, rows, tr("Zone → presse-papiers"), &mut c.hotkey_region_clip, rec, 5);
+            hotkey_row(ui, rows, tr("Pipette (couleur)"), &mut c.hotkey_picker, rec, 6);
         });
-        card(ui, tr("Application"), |ui| {
-            hotkey_row(ui, tr("Ouvrir la galerie"), &mut self.cfg.hotkey_gallery, &mut self.recording, 4);
+        group(ui, tr("Application"), |ui, rows| {
+            hotkey_row(ui, rows, tr("Ouvrir la galerie"), &mut c.hotkey_gallery, rec, 4);
+        });
+        ui.horizontal_wrapped(|ui| {
             ui.add_space(4.0);
-            ui.weak(tr("Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Maj ou Win + une touche). Laisse un champ vide pour désactiver le raccourci."));
+            ui.label(egui::RichText::new(icons::INFO).color(ui.visuals().weak_text_color()));
+            ui.label(egui::RichText::new(tr("Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Shift ou Win + une touche). Laisse un champ vide pour désactiver le raccourci.")).size(13.0).color(ui.visuals().weak_text_color()));
         });
-        card(ui, tr("Dans la galerie"), |ui| {
-            for l in [
-                tr("Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer"),
-                tr("Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral  ·  Ctrl+K : palette de commandes"),
-                tr("Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom"),
-                tr("Zoom : molette  ·  + et − par paliers  ·  0 ajuster  ·  1 taille réelle  ·  double-clic (visionneuse) : ajuster / taille réelle"),
-                tr("Éditeur : Ctrl+Z annuler  ·  Ctrl+Y rétablir  ·  clic molette ou Espace + glisser : déplacer l'image"),
-                tr("Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer"),
-                tr("Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu"),
+        ui.add_space(18.0);
+        group(ui, tr("Dans la galerie"), |ui, rows| {
+            for (icon, l) in [
+                (icons::GALLERY, tr("Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer")),
+                (icons::KEYBOARD, tr("Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral  ·  Ctrl+K : palette de commandes")),
+                (icons::IMAGE, tr("Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom")),
+                (icons::ZOOM_IN, tr("Zoom : molette  ·  + et − par paliers  ·  0 ajuster  ·  1 taille réelle  ·  double-clic (visionneuse) : ajuster / taille réelle")),
+                (icons::PEN, tr("Éditeur : Ctrl+Z annuler  ·  Ctrl+Y rétablir  ·  clic molette ou Espace + glisser : déplacer l'image")),
+                (icons::PIN, tr("Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer")),
+                (icons::MENU, tr("Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu")),
             ] {
-                ui.label(l);
+                row_info(ui, rows, icon, l);
             }
         });
         self.reset_row(ui, SetCat::Shortcuts);
     }
 
     pub(super) fn set_capture(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Capture"), tr("Comment l'écran est capturé, et ce qui se passe juste après."));
-        card(ui, tr("Source"), |ui| {
-            setting(ui, tr("Écran à capturer"), tr("L'écran utilisé par le raccourci de capture."), |ui| {
-                ui.horizontal(|ui| {
-                    ui.radio_value(&mut self.cfg.monitor_mode, "primary".to_string(), tr("Principal"));
-                    ui.radio_value(&mut self.cfg.monitor_mode, "cursor".to_string(), tr("Sous la souris"));
-                    ui.radio_value(&mut self.cfg.monitor_mode, "all".to_string(), tr("Tous les écrans"));
-                });
+        page_head(ui, icons::CAMERA, tr("Capture"), tr("Comment l'écran est capturé, et ce qui se passe juste après."));
+        let c = &mut self.cfg;
+        group(ui, tr("Source"), |ui, rows| {
+            row(ui, rows, tr("Écran à capturer"), tr("L'écran utilisé par le raccourci de capture."), |ui| {
+                segmented(
+                    ui,
+                    &mut c.monitor_mode,
+                    &[("primary".to_string(), tr("Principal")), ("cursor".to_string(), tr("Sous la souris")), ("all".to_string(), tr("Tous les écrans"))],
+                );
             });
-            divider(ui);
-            setting(
+            row(
                 ui,
+                rows,
                 tr("Résolution de sortie"),
                 tr("« Native » garde la résolution réelle de l'écran (vrai 4K sur un écran 4K). Choisir 4K sur un écran plus petit agrandit l'image, sans détail en plus."),
                 |ui| {
@@ -187,122 +195,156 @@ impl App {
                         1920 => "1080p · 1920 px",
                         _ => "720p · 1280 px",
                     };
-                    egui::ComboBox::new("res", "").selected_text(label(self.cfg.target_width)).show_ui(ui, |ui| {
+                    egui::ComboBox::new("res", "").width(220.0).selected_text(label(c.target_width)).show_ui(ui, |ui| {
                         for w in [0u32, 3840, 2560, 1920, 1280] {
-                            ui.selectable_value(&mut self.cfg.target_width, w, label(w));
+                            ui.selectable_value(&mut c.target_width, w, label(w));
                         }
                     });
                 },
             );
-            divider(ui);
-            setting(ui, tr("Délai avant capture"), tr("Attend quelques secondes avant de capturer : pratique pour ouvrir un menu ou changer de fenêtre."), |ui| {
-                ui.add(egui::Slider::new(&mut self.cfg.delay_secs, 0..=10).suffix(" s"));
+            row(ui, rows, tr("Délai avant capture"), tr("Attend quelques secondes avant de capturer : pratique pour ouvrir un menu ou changer de fenêtre."), |ui| {
+                stepper(ui, "delay", &mut c.delay_secs, 0..=60, 1, "s");
             });
         });
-        card(ui, "Timelapse", |ui| {
-            setting(ui, tr("Intervalle"), tr("Une capture toutes les N secondes quand le timelapse est activé depuis le menu de l'icône du tray."), |ui| {
-                ui.add(egui::Slider::new(&mut self.cfg.interval_secs, 5..=600).suffix(" s"));
+        group(ui, "Timelapse", |ui, rows| {
+            row(ui, rows, tr("Intervalle"), tr("Une capture toutes les N secondes quand le timelapse est activé depuis le menu de l'icône du tray."), |ui| {
+                stepper(ui, "interval", &mut c.interval_secs, 5..=3600, 5, "s");
             });
         });
-        card(ui, tr("Après la capture"), |ui| {
-            setting(ui, tr("Copier dans le presse-papiers"), tr("L'image est prête à être collée (Ctrl+V) dans un message, un document…"), |ui| {
-                ui.checkbox(&mut self.cfg.clipboard, tr("Activé"));
-            });
-            divider(ui);
-            setting(ui, tr("Clignotement de l'icône"), tr("L'icône du tray devient verte un instant pour confirmer la capture."), |ui| {
-                ui.checkbox(&mut self.cfg.flash, tr("Activé"));
-            });
-            divider(ui);
-            setting(ui, tr("Bip sonore"), tr("Joue un petit son à chaque capture (assets/beep.wav)."), |ui| {
-                ui.checkbox(&mut self.cfg.sound, tr("Activé"));
-            });
+        group(ui, tr("Après la capture"), |ui, rows| {
+            toggle_row(ui, rows, tr("Copier dans le presse-papiers"), tr("L'image est prête à être collée (Ctrl+V) dans un message, un document…"), &mut c.clipboard);
+            toggle_row(ui, rows, tr("Clignotement de l'icône"), tr("L'icône du tray devient verte un instant pour confirmer la capture."), &mut c.flash);
+            toggle_row(ui, rows, tr("Bip sonore"), tr("Joue un petit son à chaque capture (assets/beep.wav)."), &mut c.sound);
         });
         self.reset_row(ui, SetCat::Capture);
     }
 
     pub(super) fn set_files(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Fichiers"), tr("Où et comment les captures sont enregistrées."));
-        card(ui, tr("Enregistrement"), |ui| {
-            setting(ui, tr("Dossier des captures"), tr("Le dossier est créé automatiquement s'il n'existe pas."), |ui| {
+        page_head(ui, icons::FOLDER, tr("Fichiers"), tr("Où et comment les captures sont enregistrées."));
+        let c = &mut self.cfg;
+        group(ui, tr("Enregistrement"), |ui, rows| {
+            row_below(ui, rows, tr("Dossier des captures"), tr("Le dossier est créé automatiquement s'il n'existe pas."), |ui| {
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.cfg.save_dir).desired_width(380.0));
-                    if ui.button(tr("Parcourir…")).clicked() {
+                    let w = (ui.available_width() - 140.0).max(160.0);
+                    field(ui, &mut c.save_dir, "", w);
+                    if pill(ui, icons::FOLDER_OPEN, tr("Parcourir…")).clicked() {
                         if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                            self.cfg.save_dir = p.display().to_string();
+                            c.save_dir = p.display().to_string();
                         }
                     }
                 });
             });
-            divider(ui);
-            setting(ui, tr("Nom des fichiers"), tr("Variables : {window} nom de la fenêtre · {date} · {time} · {res} résolution · {n} numéro."), |ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.cfg.name_template).desired_width(300.0));
-            });
-            divider(ui);
-            setting(ui, tr("Format"), tr("PNG garde une qualité parfaite ; JPEG est plus léger."), |ui| {
-                ui.horizontal(|ui| {
-                    ui.radio_value(&mut self.cfg.format, "png".to_string(), "PNG");
-                    ui.radio_value(&mut self.cfg.format, "jpg".to_string(), "JPEG");
+            row_below(ui, rows, tr("Nom des fichiers"), tr("Clique sur une variable pour l'ajouter au nom."), |ui| {
+                field(ui, &mut c.name_template, "{date}_{time}", ui.available_width());
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                    for (var, what) in [
+                        ("{window}", tr("fenêtre")),
+                        ("{date}", tr("date")),
+                        ("{time}", tr("heure")),
+                        ("{res}", tr("résolution")),
+                        ("{n}", tr("numéro")),
+                    ] {
+                        let acc = accent_of(ui.visuals());
+                        let mut job = egui::text::LayoutJob::default();
+                        let f = FontId::monospace(12.5);
+                        job.append(var, 0.0, egui::TextFormat { font_id: f, color: acc.lerp_to_gamma(ui.visuals().text_color(), 0.3), ..Default::default() });
+                        job.append(what, 6.0, egui::TextFormat { font_id: FontId::proportional(12.5), color: ui.visuals().weak_text_color(), ..Default::default() });
+                        if ui.add(egui::Button::new(job).rounding(15.0).min_size(vec2(0.0, 30.0)).stroke(Stroke::NONE)).clicked() {
+                            let t = &mut c.name_template;
+                            if !t.is_empty() && !t.ends_with(['_', '-', ' ']) {
+                                t.push('_');
+                            }
+                            t.push_str(var);
+                        }
+                    }
                 });
-                if self.cfg.format == "jpg" {
-                    ui.add(egui::Slider::new(&mut self.cfg.jpg_quality, 50..=100).text(tr("qualité")));
-                } else {
-                    ui.horizontal(|ui| {
-                        ui.label(tr("Compression :"));
-                        ui.radio_value(&mut self.cfg.png_level, 0u8, tr("Rapide"));
-                        ui.radio_value(&mut self.cfg.png_level, 1u8, tr("Normale"));
-                        ui.radio_value(&mut self.cfg.png_level, 2u8, tr("Maximale"));
-                    });
-                }
+                // aperçu du nom avec des valeurs d'exemple
+                let now = chrono::Local::now();
+                let ext = if c.format == "jpg" { "jpg" } else { "png" };
+                let name = c
+                    .name_template
+                    .replace("{window}", "Firefox")
+                    .replace("{date}", &now.format("%Y-%m-%d").to_string())
+                    .replace("{time}", &now.format("%Hh%Mm%Ss").to_string())
+                    .replace("{res}", "2560x1440")
+                    .replace("{n}", "0001");
+                let name = if name.trim().is_empty() { "capture".to_string() } else { name };
+                ui.horizontal_wrapped(|ui| {
+                    let weak = ui.visuals().weak_text_color();
+                    ui.label(egui::RichText::new(icons::IMAGE).color(weak));
+                    ui.label(egui::RichText::new(tr("Aperçu :")).size(13.0).color(weak));
+                    ui.label(egui::RichText::new(format!("{name}.{ext}")).monospace().size(12.5));
+                });
             });
-            divider(ui);
-            setting(ui, tr("Un sous-dossier par fenêtre ou jeu"), tr("Range chaque capture dans un dossier au nom de la fenêtre active."), |ui| {
-                ui.checkbox(&mut self.cfg.folder_per_window, tr("Activé"));
+            row(ui, rows, tr("Format"), tr("PNG garde une qualité parfaite ; JPEG est plus léger."), |ui| {
+                segmented(ui, &mut c.format, &[("png".to_string(), "PNG"), ("jpg".to_string(), "JPEG")]);
             });
+            if c.format == "jpg" {
+                row(ui, rows, tr("Qualité JPEG"), tr("Plus elle est haute, plus l'image est fidèle (et lourde)."), |ui| {
+                    ui.spacing_mut().slider_width = 160.0;
+                    ui.add(egui::Slider::new(&mut c.jpg_quality, 50..=100));
+                });
+            } else {
+                row(ui, rows, tr("Compression PNG"), tr("Maximale : fichiers plus petits, enregistrement un peu plus lent. La qualité reste parfaite."), |ui| {
+                    segmented(ui, &mut c.png_level, &[(0u8, tr("Rapide")), (1u8, tr("Normale")), (2u8, tr("Maximale"))]);
+                });
+            }
+            toggle_row(ui, rows, tr("Un sous-dossier par fenêtre ou jeu"), tr("Range chaque capture dans un dossier au nom de la fenêtre active."), &mut c.folder_per_window);
         });
-        card(ui, tr("Rangement automatique"), |ui| {
-            setting(
+        group(ui, tr("Rangement automatique"), |ui, rows| {
+            row(
                 ui,
+                rows,
                 tr("Vider les vieilles captures"),
                 tr("Met à la corbeille les captures plus anciennes que ce délai. 0 = désactivé. Les favoris sont toujours conservés, et la corbeille Windows permet de tout récupérer."),
                 |ui| {
-                    ui.add(egui::Slider::new(&mut self.cfg.cleanup_days, 0..=365).suffix(tr(" jours")));
+                    stepper(ui, "cleanup", &mut c.cleanup_days, 0..=9999, 1, tr(" jours").trim());
                 },
             );
         });
-        card(ui, tr("Éditeur externe"), |ui| {
-            setting(ui, tr("Programme d'édition"), tr("Utilisé par le bouton « Modifier dans l'éditeur externe » (Paint par défaut)."), |ui| {
-                ui.add(egui::TextEdit::singleline(&mut self.cfg.editor).desired_width(300.0).hint_text("mspaint"));
+        group(ui, tr("Éditeur externe"), |ui, rows| {
+            row_below(ui, rows, tr("Programme d'édition"), tr("Utilisé par le bouton « Modifier dans l'éditeur externe » (Paint par défaut)."), |ui| {
+                ui.horizontal(|ui| {
+                    let w = (ui.available_width() - 140.0).max(160.0);
+                    field(ui, &mut c.editor, "mspaint", w);
+                    if pill(ui, icons::FOLDER_OPEN, tr("Parcourir…")).clicked() {
+                        if let Some(p) = rfd::FileDialog::new().add_filter("exe", &["exe"]).pick_file() {
+                            c.editor = p.display().to_string();
+                        }
+                    }
+                });
             });
         });
         self.reset_row(ui, SetCat::Files);
     }
 
     pub(super) fn set_look(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Apparence"), tr("Le thème et la couleur de l'interface. Les changements sont visibles tout de suite."));
+        page_head(ui, icons::PALETTE, tr("Apparence"), tr("Le thème et la couleur de l'interface. Les changements sont visibles tout de suite."));
         // les cartes de thème puis les pastilles d'accent apparaissent en cascade à l'arrivée sur la page
         let since = self.tab_at.elapsed().min(self.cat_at.elapsed()).as_secs_f32();
         let appear = |n: usize| ease_out(((since - 0.1 - n as f32 * 0.035) / 0.45).clamp(0.0, 1.0));
         if appear(THEMES.len() + ACCENTS.len() + 1) < 1.0 {
             ui.ctx().request_repaint();
         }
-        card(ui, tr("Thème"), |ui| {
-            setting(ui, tr("Thème"), tr("Choisis l'ambiance de l'interface : le changement est immédiat."), |ui| {
-                let fixed = self.cfg.accent;
-                let auto = self.cfg.accent_auto;
+        let c = &mut self.cfg;
+        group(ui, tr("Thème"), |ui, rows| {
+            row_below(ui, rows, tr("Thème"), tr("Choisis l'ambiance de l'interface : le changement est immédiat."), |ui| {
+                let fixed = c.accent;
+                let auto = c.accent_auto;
                 ui.horizontal_wrapped(|ui| {
                     for (n, (key, name)) in THEMES.iter().enumerate() {
                         let pal = palette(key);
                         // en mode « Auto », chaque vignette montre la couleur d'accent de son propre thème
                         let a = if auto { theme_accent(key) } else { fixed };
-                        if theme_card(ui, self.cfg.theme == *key, tr(name), &pal, col(a[0], a[1], a[2]), appear(n)).clicked() {
-                            self.cfg.theme = key.to_string();
+                        if theme_card(ui, c.theme == *key, tr(name), &pal, col(a[0], a[1], a[2]), appear(n)).clicked() {
+                            c.theme = key.to_string();
                         }
                     }
                 });
             });
-            divider(ui);
-            setting(ui, tr("Couleur d'accent"), tr("Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre. « Auto » prend la couleur propre à chaque thème."), |ui| {
-                ui.horizontal(|ui| {
+            row_below(ui, rows, tr("Couleur d'accent"), tr("Boutons principaux, sélection, barres et liseré du menu. Choisis une couleur rapide ou une couleur libre. « Auto » prend la couleur propre à chaque thème."), |ui| {
+                ui.horizontal_wrapped(|ui| {
                     let ctx = ui.ctx().clone();
                     let now = ctx.input(|i| i.time);
                     let rip_id = egui::Id::new("accent_ripple");
@@ -310,14 +352,14 @@ impl App {
                     // bouton « Auto » : la couleur suit le thème. Pastille aux couleurs du thème actuel + libellé,
                     // dans une capsule pour le distinguer des couleurs fixes
                     {
-                        let ta = theme_accent(&self.cfg.theme);
+                        let ta = theme_accent(&c.theme);
                         let tcol = col(ta[0], ta[1], ta[2]);
                         let (r, resp) = ui.allocate_exact_size(vec2(84.0, 28.0), Sense::click());
                         let resp = resp.on_hover_text(tr("Couleur du thème : l'accent suit le thème choisi"));
                         if resp.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
-                        let on = self.cfg.accent_auto;
+                        let on = c.accent_auto;
                         let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::cubic_out);
                         let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), on, 0.4, egui::emath::easing::back_out);
                         let k = appear(THEMES.len());
@@ -329,23 +371,23 @@ impl App {
                         p.rect_filled(r, 14.0, v.widgets.inactive.bg_fill.lerp_to_gamma(v.widgets.hovered.bg_fill, hk));
                         p.rect_stroke(r, 14.0, Stroke::new(1.0 + 1.0 * sk.clamp(0.0, 1.0), v.widgets.inactive.bg_stroke.color.lerp_to_gamma(tcol, sk.clamp(0.0, 1.0))));
                         // pastille en dégradé circulaire de quelques couleurs de thèmes, centre = couleur du thème actuel
-                        let c = pos2(r.min.x + 15.0, r.center().y);
+                        let cc = pos2(r.min.x + 15.0, r.center().y);
                         let spin = if resp.hovered() { ctx.input(|i| i.time) as f32 * 1.2 } else { 0.0 }; // tourne au survol
                         let segs = [theme_accent("ocean"), theme_accent("neon"), theme_accent("ruby"), theme_accent("mocha"), theme_accent("forest"), theme_accent("midnight")];
                         for (j, sc) in segs.iter().enumerate() {
                             let a0 = j as f32 / segs.len() as f32 * std::f32::consts::TAU;
                             let a1 = (j + 1) as f32 / segs.len() as f32 * std::f32::consts::TAU;
-                            let pts: Vec<Pos2> = std::iter::once(c)
+                            let pts: Vec<Pos2> = std::iter::once(cc)
                                 .chain((0..=6).map(|t| {
                                     let a = a0 + (a1 - a0) * t as f32 / 6.0 + spin;
-                                    c + vec2(a.cos(), a.sin()) * 9.0
+                                    cc + vec2(a.cos(), a.sin()) * 9.0
                                 }))
                                 .collect();
                             p.add(egui::Shape::convex_polygon(pts, col(sc[0], sc[1], sc[2]), Stroke::NONE));
                         }
-                        p.circle_filled(c, 5.0, tcol);
-                        p.circle_stroke(c, 5.0, Stroke::new(1.5_f32, v.widgets.inactive.bg_fill));
-                        p.text(pos2(c.x + 14.0, r.center().y), Align2::LEFT_CENTER, tr("Auto|accent"), FontId::new(14.0, egui::FontFamily::Name("bold".into())), txt);
+                        p.circle_filled(cc, 5.0, tcol);
+                        p.circle_stroke(cc, 5.0, Stroke::new(1.5_f32, v.widgets.inactive.bg_fill));
+                        p.text(pos2(cc.x + 14.0, r.center().y), Align2::LEFT_CENTER, tr("Auto|accent"), FontId::new(14.0, egui::FontFamily::Name("bold".into())), txt);
                         if resp.hovered() {
                             ctx.request_repaint();
                         }
@@ -357,23 +399,23 @@ impl App {
                             }
                         }
                         if resp.clicked() {
-                            self.cfg.accent_auto = true;
+                            c.accent_auto = true;
                             ctx.data_mut(|d| d.insert_temp(rip_id, (usize::MAX, now)));
                         }
                         ui.add_space(10.0);
                     }
-                    for (n, c) in ACCENTS.iter().enumerate() {
+                    for (n, a) in ACCENTS.iter().enumerate() {
                         let (r, resp) = ui.allocate_exact_size(vec2(28.0, 28.0), Sense::click());
                         if resp.hovered() {
                             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                         }
-                        let chosen = !self.cfg.accent_auto && self.cfg.accent == *c;
+                        let chosen = !c.accent_auto && c.accent == *a;
                         // survol : la pastille grossit ; choix : l'anneau se referme autour en rebondissant
                         let hk = ctx.animate_bool_with_time_and_easing(resp.id.with("hov"), resp.hovered(), anim::HOVER, egui::emath::easing::back_out);
                         let sk = ctx.animate_bool_with_time_and_easing(resp.id.with("sel"), chosen, 0.4, egui::emath::easing::back_out);
                         let k = appear(THEMES.len() + 1 + n);
                         let ring = ui.visuals().text_color();
-                        let color = col(c[0], c[1], c[2]);
+                        let color = col(a[0], a[1], a[2]);
                         let mut p = ui.painter().clone();
                         p.multiply_opacity(k);
                         let center = r.center() + vec2(0.0, 10.0 * (1.0 - k));
@@ -392,32 +434,30 @@ impl App {
                             }
                         }
                         if resp.clicked() {
-                            self.cfg.accent = *c;
-                            self.cfg.accent_auto = false;
+                            c.accent = *a;
+                            c.accent_auto = false;
                             ctx.data_mut(|d| d.insert_temp(rip_id, (n, now)));
                         }
                     }
                     ui.add_space(8.0);
                     // couleur libre : elle montre la couleur affichée ; la modifier repasse en couleur fixe
-                    let mut free = self.cfg.accent_rgb();
+                    let mut free = c.accent_rgb();
                     color_button(ui, "accent", &mut free);
-                    if free != self.cfg.accent_rgb() {
-                        self.cfg.accent = free;
-                        self.cfg.accent_auto = false;
+                    if free != c.accent_rgb() {
+                        c.accent = free;
+                        c.accent_auto = false;
                     }
                 });
             });
         });
-        card(ui, tr("Menu de l'icône du tray"), |ui| {
-            setting(
+        group(ui, tr("Menu de l'icône du tray"), |ui, rows| {
+            row(
                 ui,
+                rows,
                 tr("Style du menu"),
                 tr("Moderne : menu dessiné aux couleurs de l'appli (police Inter, coins arrondis), qui s'ouvre en une fraction de seconde. Système : menu natif de Windows, instantané."),
                 |ui| {
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut self.cfg.tray_menu, "modern".to_string(), tr("Moderne"));
-                        ui.radio_value(&mut self.cfg.tray_menu, "native".to_string(), tr("Système"));
-                    });
+                    segmented(ui, &mut c.tray_menu, &[("modern".to_string(), tr("Moderne")), ("native".to_string(), tr("Système"))]);
                 },
             );
         });
@@ -425,18 +465,16 @@ impl App {
     }
 
     pub(super) fn set_privacy(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Confidentialité"), tr("Évite de capturer des fenêtres sensibles par accident."));
-        card(ui, tr("Fenêtres à ne jamais capturer"), |ui| {
-            setting(
+        page_head(ui, icons::SHIELD, tr("Confidentialité"), tr("Évite de capturer des fenêtres sensibles par accident."));
+        let c = &mut self.cfg;
+        group(ui, tr("Fenêtres à ne jamais capturer"), |ui, rows| {
+            row_below(
                 ui,
+                rows,
                 tr("Mots à surveiller"),
                 tr("Si le titre de la fenêtre active contient l'un de ces mots (séparés par des virgules), la capture est ignorée."),
                 |ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.cfg.blocklist)
-                            .desired_width(f32::INFINITY)
-                            .hint_text(tr("ex : keepass, bitwarden, banque")),
-                    );
+                    field(ui, &mut c.blocklist, tr("ex : keepass, bitwarden, banque"), ui.available_width());
                 },
             );
         });
@@ -444,10 +482,11 @@ impl App {
     }
 
     pub(super) fn set_system(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Système"), tr("Démarrage, sauvegarde des réglages et informations."));
-        card(ui, tr("Langue"), |ui| {
-            setting(
+        page_head(ui, icons::SYSTEM, tr("Système"), tr("Démarrage, sauvegarde des réglages et informations."));
+        group(ui, tr("Langue"), |ui, rows| {
+            row(
                 ui,
+                rows,
                 tr("Langue de l'interface"),
                 tr("« Automatique » suit la langue de Windows (anglais si elle n'est pas disponible). Le changement est visible tout de suite."),
                 |ui| {
@@ -458,7 +497,7 @@ impl App {
                             Some((_, n, false)) => format!("{n} · {}", tr("traduction non vérifiée")),
                         }
                     };
-                    egui::ComboBox::new("lang", "").width(300.0).selected_text(name(&self.cfg.language)).show_ui(ui, |ui| {
+                    egui::ComboBox::new("lang", "").width(260.0).selected_text(name(&self.cfg.language)).show_ui(ui, |ui| {
                         for (code, _, _) in LANGUAGES {
                             ui.selectable_value(&mut self.cfg.language, code.to_string(), name(code));
                         }
@@ -466,29 +505,27 @@ impl App {
                 },
             );
         });
-        card(ui, tr("Démarrage"), |ui| {
-            setting(ui, tr("Lancer avec Windows"), tr("Shirokap démarre en silence dans la zone de notification à l'ouverture de session."), |ui| {
-                if ui.checkbox(&mut self.autostart, tr("Activé")).changed() {
-                    set_autostart(self.autostart);
-                }
-            });
+        group(ui, tr("Démarrage"), |ui, rows| {
+            if toggle_row(ui, rows, tr("Lancer avec Windows"), tr("Shirokap démarre en silence dans la zone de notification à l'ouverture de session."), &mut self.autostart) {
+                set_autostart(self.autostart);
+            }
         });
-        card(ui, tr("Configuration"), |ui| {
-            setting(ui, tr("Sauvegarder ou transférer tes réglages"), tr("Exporte tes réglages dans un fichier, ou importe-les sur un autre PC."), |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button(tr("Exporter…")).clicked() {
+        group(ui, tr("Configuration"), |ui, rows| {
+            row_below(ui, rows, tr("Sauvegarder ou transférer tes réglages"), tr("Exporte tes réglages dans un fichier, ou importe-les sur un autre PC."), |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    if pill(ui, icons::EXPORT, tr("Exporter…")).clicked() {
                         if let Some(p) = rfd::FileDialog::new().set_file_name("shirokap-config.toml").save_file() {
                             let _ = std::fs::write(p, toml::to_string_pretty(&self.cfg).unwrap_or_default());
                         }
                     }
-                    if ui.button(tr("Importer…")).clicked() {
+                    if pill(ui, icons::FOLDER_OPEN, tr("Importer…")).clicked() {
                         if let Some(p) = rfd::FileDialog::new().add_filter(tr("Configuration"), &["toml"]).pick_file() {
                             if let Some(c) = std::fs::read_to_string(p).ok().and_then(|s| toml::from_str::<Config>(&s).ok()) {
-                                self.cfg = c; // à enregistrer ensuite avec le bouton du bas
+                                self.cfg = c; // à enregistrer ensuite avec la pilule du bas
                             }
                         }
                     }
-                    if ui.button(tr("Ouvrir le dossier de configuration")).clicked() {
+                    if ghost(ui, icons::FOLDER_COG, tr("Ouvrir le dossier de configuration")).clicked() {
                         if let Some(d) = config_path().parent() {
                             let _ = Command::new("explorer").arg(d).spawn();
                         }
@@ -496,17 +533,18 @@ impl App {
                 });
             });
         });
-        card(ui, tr("Dépannage"), |ui| {
-            setting(
+        group(ui, tr("Dépannage"), |ui, rows| {
+            row_below(
                 ui,
+                rows,
                 tr("Journal"),
                 tr("En cas de problème (plantage, capture qui échoue, raccourci indisponible), le journal contient les détails. Joins-le quand tu signales un bug."),
                 |ui| {
-                    ui.horizontal(|ui| {
-                        if ui.button(tr("Ouvrir le journal")).clicked() {
+                    ui.horizontal_wrapped(|ui| {
+                        if pill(ui, icons::BUG, tr("Ouvrir le journal")).clicked() {
                             let _ = Command::new("notepad").arg(log_path()).spawn();
                         }
-                        if ui.button(tr("Ouvrir le dossier des journaux")).clicked() {
+                        if ghost(ui, icons::FOLDER_OPEN, tr("Ouvrir le dossier des journaux")).clicked() {
                             let _ = std::fs::create_dir_all(log_dir());
                             let _ = Command::new("explorer").arg(log_dir()).spawn();
                         }
@@ -514,13 +552,13 @@ impl App {
                 },
             );
         });
-        card(ui, tr("À propos"), |ui| {
-            ui.label(format!("Shirokap {}", env!("CARGO_PKG_VERSION")));
-            ui.weak(tr("Police Inter © Rasmus Andersson, licence SIL Open Font License (voir assets/fonts/LICENSE-Inter.txt)."));
-            ui.add_space(4.0);
-            if ui.button(tr("Revoir l'écran d'accueil")).clicked() {
-                self.show_welcome = true;
-            }
+        group(ui, tr("À propos"), |ui, rows| {
+            let title = format!("Shirokap {}", env!("CARGO_PKG_VERSION"));
+            row(ui, rows, &title, tr("Police Inter © Rasmus Andersson, licence SIL Open Font License (voir assets/fonts/LICENSE-Inter.txt)."), |ui| {
+                if pill(ui, icons::SPARKLES, tr("Revoir l'écran d'accueil")).clicked() {
+                    self.show_welcome = true;
+                }
+            });
         });
         self.reset_row(ui, SetCat::System);
     }

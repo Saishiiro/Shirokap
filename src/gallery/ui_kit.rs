@@ -628,29 +628,6 @@ pub(crate) fn card(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::U
     ui.add_space(12.0);
 }
 
-/// En-tête d'une rubrique des paramètres.
-pub(crate) fn page_head(ui: &mut egui::Ui, title: &str, sub: &str) {
-    ui.label(bold_text(title, 20.0));
-    ui.weak(sub);
-    ui.add_space(8.0);
-}
-
-/// Un réglage : titre, courte explication, puis le contrôle.
-pub(crate) fn setting(ui: &mut egui::Ui, title: &str, desc: &str, add: impl FnOnce(&mut egui::Ui)) {
-    ui.label(bold_text(title, 15.0));
-    if !desc.is_empty() {
-        ui.weak(desc);
-    }
-    ui.add_space(2.0);
-    add(ui);
-}
-
-pub(crate) fn divider(ui: &mut egui::Ui) {
-    ui.add_space(6.0);
-    ui.separator();
-    ui.add_space(6.0);
-}
-
 /// Raccourci fait d'une seule touche qu'on tape d'habitude (lettre, chiffre, Espace…), et non d'une
 /// touche de fonction : elle sera captée partout dans Windows.
 pub(crate) fn lone_typing_key(s: &str) -> bool {
@@ -660,32 +637,6 @@ pub(crate) fn lone_typing_key(s: &str) -> bool {
     }
     let fkey = s.len() > 1 && (s.starts_with('F') || s.starts_with('f')) && s[1..].parse::<u8>().is_ok();
     !fkey && !["PrintScreen", "Pause", "ScrollLock"].iter().any(|k| k.eq_ignore_ascii_case(s))
-}
-
-pub(crate) fn hotkey_row(ui: &mut egui::Ui, label: &str, val: &mut String, rec: &mut Option<usize>, idx: usize) {
-    ui.horizontal(|ui| {
-        ui.allocate_ui_with_layout(vec2(175.0, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
-            ui.set_min_size(vec2(175.0, 24.0));
-            ui.label(label);
-        });
-        if *rec == Some(idx) {
-            ui.colored_label(Color32::GOLD, tr("Appuie sur une touche ou une combinaison…  (Échap = annuler · Retour arrière = vider)"));
-            if ui.button(tr("Annuler")).clicked() {
-                *rec = None;
-            }
-        } else {
-            ui.add(egui::TextEdit::singleline(val).desired_width(170.0).hint_text(tr("désactivé")));
-            if ui.button(tr("Enregistrer|raccourci")).clicked() {
-                *rec = Some(idx);
-            }
-            if !val.is_empty() && val.parse::<global_hotkey::hotkey::HotKey>().is_err() {
-                ui.colored_label(Color32::LIGHT_RED, "invalide");
-            } else if lone_typing_key(val) {
-                ui.colored_label(col(251, 191, 36), ic(crate::icons::ALERT, tr("Touche seule : elle ne pourra plus être tapée dans les autres applications.")))
-                    .on_hover_text(tr("Un raccourci global capte la touche partout dans Windows tant que Shirokap tourne."));
-            }
-        }
-    });
 }
 
 /// Écran vide : grande icône dans un halo de la couleur d'accent, titre, explication et un bouton.

@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 343] = [
+pub static TABLE: [[&str; 5]; 359] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -345,5 +345,21 @@ pub static TABLE: [[&str; 5]; 343] = [
     ["Touche seule : elle ne pourra plus être tapée dans les autres applications.", "Single key: it can no longer be typed in other apps.", "Tecla sola: ya no se podrá escribir en otras aplicaciones.", "Einzelne Taste: Sie kann in anderen Apps nicht mehr eingegeben werden.", "单键：在其他应用中将无法再输入该键。"],
     ["Un raccourci global capte la touche partout dans Windows tant que Shirokap tourne.", "A global shortcut catches the key everywhere in Windows while Shirokap is running.", "Un atajo global captura la tecla en todo Windows mientras Shirokap está en ejecución.", "Ein globales Tastenkürzel fängt die Taste überall in Windows ab, solange Shirokap läuft.", "Shirokap 运行时，全局快捷键会在整个 Windows 中拦截该键。"],
     ["Des touches ou combinaisons qui fonctionnent partout dans Windows. Écris-les dans le champ, ou clique sur « Enregistrer » puis appuie sur les touches.", "Keys or combinations that work anywhere in Windows. Type them in the field, or click “Record” and press the keys.", "Teclas o combinaciones que funcionan en todo Windows. Escríbelas en el campo o haz clic en «Grabar» y pulsa las teclas.", "Tasten oder Kombinationen, die überall in Windows funktionieren. Gib sie im Feld ein oder klicke auf „Aufzeichnen“ und drücke die Tasten.", "在 Windows 任意位置都可使用的按键或组合键。可在输入框中输入，或点击“录制”后按下按键。"],
-    ["Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Maj ou Win + une touche). Laisse un champ vide pour désactiver le raccourci.", "A single key works (F7, Pause, P…), as does a combination (Ctrl, Alt, Shift or Win + a key). Leave a field empty to turn the shortcut off.", "Funciona una tecla sola (F7, Pausa, P…) o una combinación (Ctrl, Alt, Mayús o Win + una tecla). Deja un campo vacío para desactivar el atajo.", "Eine einzelne Taste funktioniert (F7, Pause, P…), ebenso eine Kombination (Strg, Alt, Umschalt oder Win + eine Taste). Lass ein Feld leer, um das Tastenkürzel zu deaktivieren.", "单个键（F7、Pause、P…）或组合键（Ctrl、Alt、Shift 或 Win + 一个键）均可。留空即可关闭该快捷键。"],
+    ["Appuie sur les touches…", "Press the keys…", "Pulsa las teclas…", "Tasten drücken…", "请按下按键…"],
+    ["Désactiver", "Turn off", "Desactivar", "Deaktivieren", "停用"],
+    ["Échap : annuler · Retour arrière : vider", "Esc: cancel · Backspace: clear", "Esc: cancelar · Retroceso: vaciar", "Esc: abbrechen · Rücktaste: leeren", "Esc：取消 · 退格：清空"],
+    ["Touche non reconnue. Exemples : F7, Pause, Ctrl+Shift+S, Alt+F12.", "Key not recognized. Examples: F7, Pause, Ctrl+Shift+S, Alt+F12.", "Tecla no reconocida. Ejemplos: F7, Pause, Ctrl+Shift+S, Alt+F12.", "Taste nicht erkannt. Beispiele: F7, Pause, Ctrl+Shift+S, Alt+F12.", "无法识别的按键。示例：F7、Pause、Ctrl+Shift+S、Alt+F12。"],
+    ["Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Shift ou Win + une touche). Laisse un champ vide pour désactiver le raccourci.", "A single key works (F7, Pause, P…), as does a combination (Ctrl, Alt, Shift or Win + a key). Leave a field empty to turn the shortcut off.", "Funciona una tecla sola (F7, Pause, P…) o una combinación (Ctrl, Alt, Shift o Win + una tecla). Deja un campo vacío para desactivar el atajo.", "Eine einzelne Taste funktioniert (F7, Pause, P…), ebenso eine Kombination (Ctrl, Alt, Shift oder Win + eine Taste). Lass ein Feld leer, um das Tastenkürzel zu deaktivieren.", "单个键（F7、Pause、P…）或组合键（Ctrl、Alt、Shift 或 Win + 一个键）均可。留空即可关闭该快捷键。"],
+    ["Clique, puis appuie sur la touche ou la combinaison", "Click, then press the key or combination", "Haz clic y pulsa la tecla o la combinación", "Klicken, dann die Taste oder Kombination drücken", "点击后按下按键或组合键"],
+    ["Clique sur une variable pour l'ajouter au nom.", "Click a variable to add it to the name.", "Haz clic en una variable para añadirla al nombre.", "Klicke auf eine Variable, um sie zum Namen hinzuzufügen.", "点击变量即可将其加入文件名。"],
+    ["fenêtre", "window", "ventana", "Fenster", "窗口"],
+    ["date", "date", "fecha", "Datum", "日期"],
+    ["heure", "time", "hora", "Uhrzeit", "时间"],
+    ["résolution", "resolution", "resolución", "Auflösung", "分辨率"],
+    ["numéro", "number", "número", "Nummer", "编号"],
+    ["Aperçu :", "Preview:", "Vista previa:", "Vorschau:", "预览："],
+    ["Qualité JPEG", "JPEG quality", "Calidad JPEG", "JPEG-Qualität", "JPEG 质量"],
+    ["Plus elle est haute, plus l'image est fidèle (et lourde).", "The higher it is, the more faithful (and heavier) the image.", "Cuanto más alta, más fiel (y pesada) es la imagen.", "Je höher, desto originalgetreuer (und größer) das Bild.", "数值越高，图像越清晰（文件也越大）。"],
+    ["Compression PNG", "PNG compression", "Compresión PNG", "PNG-Komprimierung", "PNG 压缩"],
+    ["Maximale : fichiers plus petits, enregistrement un peu plus lent. La qualité reste parfaite.", "Maximum: smaller files, slightly slower saving. Quality stays perfect.", "Máxima: archivos más pequeños, guardado algo más lento. La calidad sigue siendo perfecta.", "Maximal: kleinere Dateien, etwas langsameres Speichern. Die Qualität bleibt perfekt.", "最高：文件更小，保存稍慢。画质保持无损。"],
 ];

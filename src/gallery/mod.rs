@@ -13,6 +13,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+mod form;
 mod grid;
 mod palette;
 mod hotkeys;
@@ -20,6 +21,7 @@ mod settings;
 pub(crate) mod ui_kit;
 mod views;
 
+use form::*;
 use hotkeys::*;
 use ui_kit::*;
 use crate::icons;
