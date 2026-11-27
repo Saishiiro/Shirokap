@@ -127,7 +127,7 @@ pub(crate) fn palette(theme: &str) -> Pal {
     };
     match theme {
         // aux couleurs du logo : panneaux mauves, texte et couleur d'accent blancs
-        "shirokap" => mk(true, [98, 78, 182], [84, 66, 160], [112, 92, 196], [84, 66, 160], [124, 104, 206], [138, 118, 216], [118, 98, 200], [150, 132, 224], [196, 184, 244], [255, 255, 255]),
+        "shirokap" => mk(true, [122, 88, 160], [106, 75, 142], [136, 102, 174], [106, 75, 142], [144, 110, 182], [160, 126, 198], [140, 106, 178], [176, 146, 210], [214, 194, 238], [255, 255, 255]),
         "graphite" => mk(true, [30, 30, 30], [23, 23, 23], [38, 38, 38], [24, 24, 24], [50, 50, 50], [62, 62, 62], [56, 56, 56], [74, 74, 74], [104, 104, 104], [230, 230, 230]),
         "midnight" => mk(true, [15, 20, 36], [10, 14, 26], [22, 29, 50], [10, 14, 26], [31, 41, 70], [42, 54, 88], [36, 47, 78], [54, 68, 108], [82, 100, 150], [226, 232, 246]),
         "oled" => mk(true, [0, 0, 0], [8, 8, 9], [16, 16, 18], [10, 10, 12], [28, 28, 32], [40, 40, 44], [36, 36, 40], [58, 58, 64], [90, 90, 98], [236, 236, 238]),
@@ -288,7 +288,11 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     v.slider_trailing_fill = true;
     v.widgets.active.fg_stroke = Stroke::new(1.5_f32, on_accent(sel));
     v.widgets.noninteractive.bg_fill = bg;
-    v.widgets.noninteractive.weak_bg_fill = bg;
+    // texte secondaire (`weak`) : egui le place à mi-chemin entre le texte et cette couleur. On la rapproche
+    // du texte pour qu'il reste lisible, davantage sur un fond de luminosité moyenne (thème Shirokap)
+    let bg_lum = 0.299 * bg.r() as f32 + 0.587 * bg.g() as f32 + 0.114 * bg.b() as f32;
+    let k = if pal.dark { 0.3 + 0.2 * ((bg_lum - 40.0) / 60.0).clamp(0.0, 1.0) } else { 0.2 };
+    v.widgets.noninteractive.weak_bg_fill = bg.lerp_to_gamma(text, k);
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, line);
     v.widgets.noninteractive.rounding = round;
     ctx.set_visuals(v);
@@ -363,14 +367,21 @@ pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
     resp
 }
 
-/// Logo de l'application : un losange creux dans une tuile teintée de la couleur d'accent.
-pub(crate) fn logo_mark(ui: &mut egui::Ui, acc: Color32) {
+/// Logo de l'application (l'image d'origine, chargée une seule fois puis gardée en mémoire).
+pub(crate) fn logo_mark(ui: &mut egui::Ui) {
+    let id = egui::Id::new("logo_texture");
+    let ctx = ui.ctx().clone();
+    let tex = ctx.data(|d| d.get_temp::<TextureHandle>(id)).unwrap_or_else(|| {
+        let img = image::load_from_memory(include_bytes!("../../assets/logo.png"))
+            .map(|i| i.resize_exact(96, 96, image::imageops::FilterType::Lanczos3).to_rgba8())
+            .unwrap_or_else(|_| image::RgbaImage::new(96, 96));
+        let ci = egui::ColorImage::from_rgba_unmultiplied([96, 96], img.as_raw());
+        let t = ctx.load_texture("logo", ci, egui::TextureOptions::LINEAR);
+        ctx.data_mut(|d| d.insert_temp(id, t.clone()));
+        t
+    });
     let (rect, _) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::hover());
-    let p = ui.painter();
-    p.rect_filled(rect, 9.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 46));
-    let (c, r) = (rect.center(), 8.5);
-    let pts = vec![c + vec2(0.0, -r), c + vec2(r, 0.0), c + vec2(0.0, r), c + vec2(-r, 0.0)];
-    p.add(egui::Shape::closed_line(pts, Stroke::new(2.2_f32, acc)));
+    ui.painter().image(tex.id(), rect, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
 }
 
 /// Entrée de la barre latérale : une pilule qui se remplit de la couleur d'accent quand elle est active.

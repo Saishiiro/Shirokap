@@ -764,7 +764,7 @@ impl eframe::App for App {
                     ui.multiply_opacity(((nav_w - 196.0) / 40.0).clamp(0.0, 1.0));
                     ui.horizontal(|ui| {
                         ui.add_space(4.0);
-                        logo_mark(ui, self.shown_acc);
+                        logo_mark(ui);
                         ui.label(bold_text("Shirokap", 17.0));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if sidebar_icon_button(ui).on_hover_text(tr("Réduire le menu (Ctrl+B)")).clicked() {
