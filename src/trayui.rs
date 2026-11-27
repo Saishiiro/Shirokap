@@ -47,7 +47,7 @@ fn card_need_w(ctx: &egui::Context, items: &[It]) -> f32 {
         .map(|it| match it {
             It::Sep => 0.0,
             It::Info(t) => 14.0 + w(t, 12.5) + 12.0,
-            It::Act { icon, label, hint, checked } => {
+            It::Act { icon, label, hint, checked, .. } => {
                 let right = if !hint.is_empty() {
                     w(hint, 12.0) + 12.0 + 14.0
                 } else if *checked == Some(true) && !icon.is_empty() {
