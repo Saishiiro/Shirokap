@@ -136,6 +136,7 @@ struct App {
     shown_cat: SetCat,   // rubrique des paramètres affichée à l'image précédente
     cat_at: Instant,     // changement de rubrique des paramètres
     sel_shown: usize,    // nombre affiché dans la barre de sélection (gardé pendant qu'elle se replie)
+    sheet_rect: Rect,    // feuille de contenu (pour placer les éléments flottants)
 }
 
 pub fn run(settings: bool) {
@@ -238,6 +239,7 @@ impl App {
             shown_cat: SetCat::Shortcuts,
             cat_at: Instant::now() - Duration::from_secs(1),
             sel_shown: 0,
+            sheet_rect: Rect::NOTHING,
         }
     }
 
@@ -337,6 +339,67 @@ impl App {
             5 => &mut self.cfg.hotkey_region_clip,
             _ => &mut self.cfg.hotkey_picker,
         }
+    }
+
+    /// Pilule « Modifications non enregistrées · Annuler · Enregistrer », collée en bas de la feuille de
+    /// contenu tant qu'il reste quelque chose à enregistrer (ou qu'un raccourci est invalide).
+    fn save_pill(&mut self, ctx: &egui::Context) {
+        let ok = hotkeys_ok(&self.cfg);
+        let dirty = toml::to_string(&self.cfg).unwrap_or_default() != self.saved;
+        let k = ctx.animate_bool_with_time_and_easing(egui::Id::new("save_pill"), dirty || !ok, anim::ENTER, egui::emath::easing::cubic_out);
+        if k < 0.01 || self.sheet_rect == Rect::NOTHING {
+            return;
+        }
+        let acc = self.shown_acc;
+        let sheet = self.sheet_rect;
+        let pos = pos2(sheet.center().x, sheet.max.y - 18.0 + 28.0 * (1.0 - k));
+        egui::Area::new(egui::Id::new("save_pill_area"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos)
+            .pivot(Align2::CENTER_BOTTOM)
+            .show(ctx, |ui| {
+                ui.multiply_opacity(k);
+                let dark = ui.visuals().dark_mode;
+                let fill = ui.visuals().widgets.inactive.weak_bg_fill;
+                egui::Frame::none()
+                    .fill(fill)
+                    .rounding(24.0)
+                    .shadow(egui::epaint::Shadow { offset: vec2(0.0, 12.0), blur: 32.0, spread: 0.0, color: Color32::from_black_alpha(if dark { 150 } else { 50 }) })
+                    .inner_margin(egui::Margin { left: 18.0, right: 6.0, top: 6.0, bottom: 6.0 })
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 6.0;
+                            let (dot, msg) = if ok {
+                                (col(251, 191, 36), tr("Modifications non enregistrées"))
+                            } else {
+                                (col(248, 113, 113), tr("Un raccourci est invalide"))
+                            };
+                            let (r, _) = ui.allocate_exact_size(vec2(8.0, 8.0), Sense::hover());
+                            ui.painter().circle_filled(r.center(), 3.5, dot);
+                            ui.add_space(2.0);
+                            ui.label(msg);
+                            ui.add_space(8.0);
+                            let cancel = egui::Button::new(ic(icons::UNDO, tr("Annuler")))
+                                .fill(Color32::TRANSPARENT)
+                                .stroke(Stroke::NONE)
+                                .rounding(18.0)
+                                .min_size(vec2(0.0, 36.0));
+                            if ui.add_enabled(dirty, cancel).clicked() {
+                                self.cfg = Config::load();
+                            }
+                            let label = egui::RichText::new(ic(icons::SAVE, tr("Enregistrer")))
+                                .color(on_accent(acc))
+                                .family(egui::FontFamily::Name("bold".into()));
+                            let save = egui::Button::new(label).fill(acc).stroke(Stroke::NONE).rounding(18.0).min_size(vec2(0.0, 36.0));
+                            if ui.add_enabled(dirty && ok, save).clicked() {
+                                self.cfg.save(); // le démon relit la config tout seul
+                                self.saved = toml::to_string(&self.cfg).unwrap_or_default();
+                                self.items = list_items(&self.cfg.save_dir);
+                                self.status = ic(icons::SUCCESS, tr("Enregistré ✔").trim_end_matches('✔').trim_end());
+                            }
+                        });
+                    });
+            });
     }
 
     fn toggle_fullscreen(&mut self, ctx: &egui::Context) {
@@ -681,52 +744,61 @@ impl eframe::App for App {
         self.focused = foc;
 
         let immersive = self.fullscreen && self.view.is_some() && self.editor.is_none() && self.compare.is_none();
+        let pal = self.shown_pal;
         if !immersive {
-        let side_fill = self.shown_pal.side;
-        // le menu latéral s'ouvre et se replie en glissant (56 px replié, 190 px ouvert)
+        // menu latéral : un panneau arrondi posé sur le fond de la fenêtre. Il s'ouvre et se replie
+        // en glissant (une colonne d'icônes une fois replié)
         let open_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("nav_open"), self.sidebar_open, anim::SIDEBAR, egui::emath::easing::cubic_in_out);
-        let nav_w = 56.0 + (190.0 - 56.0) * open_k;
-        let wide = nav_w > 150.0;
+        let nav_w = 76.0 + (236.0 - 76.0) * open_k;
+        let wide = nav_w > 196.0;
         egui::SidePanel::left("nav")
             .exact_width(nav_w)
             .resizable(false)
-            .frame(egui::Frame::none().fill(side_fill).inner_margin(egui::Margin::same(if wide { 14.0 } else { 11.0 })))
+            .show_separator_line(false)
+            .frame(egui::Frame::none().fill(pal.win).inner_margin(egui::Margin { left: 12.0, right: 0.0, top: 12.0, bottom: 12.0 }))
             .show(ctx, |ui| {
+                egui::Frame::none().fill(pal.bg).rounding(18.0).inner_margin(egui::Margin::symmetric(10.0, 16.0)).show(ui, |ui| {
+                ui.set_min_size(ui.available_size());
+                ui.spacing_mut().item_spacing.y = 4.0;
                 if wide {
-                    ui.multiply_opacity(((nav_w - 150.0) / 40.0).clamp(0.0, 1.0));
-                    ui.add_space(6.0);
+                    ui.multiply_opacity(((nav_w - 196.0) / 40.0).clamp(0.0, 1.0));
                     ui.horizontal(|ui| {
-                        ui.label(bold_text("Shirokap", 22.0));
+                        ui.add_space(4.0);
+                        logo_mark(ui, self.shown_acc);
+                        ui.label(bold_text("Shirokap", 17.0));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if sidebar_icon_button(ui).on_hover_text(tr("Réduire le menu (Ctrl+B)")).clicked() {
                                 self.sidebar_open = false;
                             }
                         });
                     });
-                    ui.add_space(14.0);
+                    ui.add_space(18.0);
                     nav_item(ui, &mut self.tab, Tab::Gallery, icons::GALLERY, tr("Galerie"));
                     nav_item(ui, &mut self.tab, Tab::Stats, icons::STATS, tr("Statistiques"));
                     nav_item(ui, &mut self.tab, Tab::Settings, icons::SETTINGS, tr("Paramètres"));
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                        ui.add_space(4.0);
-                        ui.weak(trf("Version {0}", &[&env!("CARGO_PKG_VERSION")]));
+                        ui.horizontal(|ui| {
+                            ui.add_space(14.0);
+                            ui.weak(trf("Version {0}", &[&env!("CARGO_PKG_VERSION")]));
+                        });
                         ui.add_space(6.0);
-                        let label = if self.fullscreen {
-                            ic(icons::EXIT_FULLSCREEN, tr("Quitter le plein écran"))
+                        let (icon, label) = if self.fullscreen {
+                            (icons::EXIT_FULLSCREEN, tr("Quitter le plein écran"))
                         } else {
-                            ic(icons::FULLSCREEN, tr("Plein écran"))
+                            (icons::FULLSCREEN, tr("Plein écran"))
                         };
-                        if ui.add(egui::Button::new(label).shortcut_text("F11")).clicked() {
+                        if pill_button(ui, icon, label, "F11").clicked() {
                             self.toggle_fullscreen(ctx);
                         }
                     });
                 } else {
                     // menu réduit : une fine colonne d'icônes (onglets + plein écran)
-                    ui.add_space(6.0);
-                    if sidebar_icon_button(ui).on_hover_text(tr("Ouvrir le menu (Ctrl+B)")).clicked() {
-                        self.sidebar_open = true;
-                    }
-                    ui.add_space(14.0);
+                    ui.vertical_centered(|ui| {
+                        if sidebar_icon_button(ui).on_hover_text(tr("Ouvrir le menu (Ctrl+B)")).clicked() {
+                            self.sidebar_open = true;
+                        }
+                    });
+                    ui.add_space(18.0);
                     for (t, icon, name) in [
                         (Tab::Gallery, icons::GALLERY, tr("Galerie")),
                         (Tab::Stats, icons::STATS, tr("Statistiques")),
@@ -737,7 +809,6 @@ impl eframe::App for App {
                         }
                     }
                     ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                        ui.add_space(4.0);
                         let (icon, tip) = if self.fullscreen {
                             (icons::EXIT_FULLSCREEN, tr("Quitter le plein écran"))
                         } else {
@@ -748,68 +819,13 @@ impl eframe::App for App {
                         }
                     });
                 }
+                });
             });
-
-        match self.tab {
-            Tab::Gallery => {
-                egui::TopBottomPanel::bottom("status").show(ctx, |ui| {
-                    ui.horizontal(|ui| {
-                        ui.weak(format!("{} · {}", n_captures(self.stat.0), human(self.stat.1)));
-                        ui.weak(&self.status);
-                    });
-                });
-            }
-            Tab::Stats => {}
-            Tab::Settings => {
-                let ok = hotkeys_ok(&self.cfg);
-                let dirty = toml::to_string(&self.cfg).unwrap_or_default() != self.saved;
-                egui::TopBottomPanel::bottom("save").show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.horizontal(|ui| {
-                        // « Enregistrer » prend la couleur d'accent quand il y a quelque chose à enregistrer
-                        let acc = self.shown_acc;
-                        let save_txt = ic(icons::SAVE, tr("Enregistrer"));
-                        let save_btn = if dirty && ok {
-                            egui::Button::new(egui::RichText::new(save_txt).color(on_accent(acc))).fill(acc)
-                        } else {
-                            egui::Button::new(save_txt)
-                        };
-                        if ui.add_enabled(dirty && ok, save_btn).clicked() {
-                            self.cfg.save(); // le démon relit la config tout seul
-                            self.saved = toml::to_string(&self.cfg).unwrap_or_default();
-                            self.items = list_items(&self.cfg.save_dir);
-                            self.status = ic(icons::SUCCESS, tr("Enregistré ✔").trim_end_matches('✔').trim_end());
-                        }
-                        if ui.add_enabled(dirty, egui::Button::new(ic(icons::UNDO, tr("Annuler")))).clicked() {
-                            self.cfg = Config::load();
-                        }
-                        if ui
-                            .button(ic(icons::RESET, tr("Tout réinitialiser")))
-                            .on_hover_text(tr("Remet TOUS les réglages de TOUTES les rubriques à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer » (« Annuler » permet de revenir en arrière)."))
-                            .clicked()
-                        {
-                            self.cfg = Config::default();
-                        }
-                        if !ok {
-                            ui.colored_label(Color32::LIGHT_RED, tr("Un raccourci est invalide"));
-                        } else if dirty {
-                            ui.colored_label(Color32::GOLD, tr("Modifications non enregistrées"));
-                        } else {
-                            ui.weak(&self.status);
-                        }
-                    });
-                    ui.add_space(4.0);
-                });
-            }
-        }
-
         }
         let content = if immersive {
             egui::Frame::none().fill(Color32::BLACK)
         } else {
-            egui::Frame::none()
-                .fill(ctx.style().visuals.panel_fill)
-                .inner_margin(egui::Margin::symmetric(22.0, 16.0))
+            egui::Frame::none().fill(pal.win).inner_margin(12.0)
         };
         // palette de commandes : son clavier passe avant les autres raccourcis
         let pending = self.palette_keys(ctx);
@@ -855,6 +871,37 @@ impl eframe::App for App {
             ctx.request_repaint();
         }
         egui::CentralPanel::default().frame(content).show(ctx, |ui| {
+            if immersive {
+                self.gallery_ui(ui);
+                return;
+            }
+            // la feuille de contenu : un panneau arrondi, comme le menu latéral
+            let sheet = ui.max_rect();
+            self.sheet_rect = sheet;
+            ui.painter().rect_filled(sheet, 18.0, pal.bg);
+            let inner = sheet.shrink2(vec2(22.0, 16.0));
+            let mut ui = ui.new_child(egui::UiBuilder::new().max_rect(inner).layout(egui::Layout::top_down(egui::Align::Min)));
+            let ui = &mut ui;
+            // en-tête des pages : titre à gauche, barre de commandes (Ctrl+K) à droite
+            // (pas dans la visionneuse, l'éditeur ni le comparateur, qui ont leur propre barre)
+            let busy = self.tab == Tab::Gallery && (self.view.is_some() || self.editor.is_some() || self.compare.is_some());
+            if !busy {
+                ui.horizontal(|ui| {
+                    let title = match self.tab {
+                        Tab::Gallery => tr("Galerie"),
+                        Tab::Stats => tr("Statistiques"),
+                        Tab::Settings => tr("Paramètres"),
+                    };
+                    ui.label(bold_text(title, 22.0));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let w = ui.available_width().min(300.0);
+                        if w > 120.0 && command_bar(ui, w).on_hover_text(tr("Palette de commandes (Ctrl+K)")).clicked() {
+                            self.cmd = Some(palette::CmdPalette::new());
+                        }
+                    });
+                });
+                ui.add_space(12.0);
+            }
             ui.multiply_opacity(tab_k);
             ui.add_space(24.0 * (1.0 - tab_k));
             match self.tab {
@@ -863,6 +910,9 @@ impl eframe::App for App {
             Tab::Stats => self.stats_ui(ui),
             }
         });
+        if self.tab == Tab::Settings && !immersive {
+            self.save_pill(ctx);
+        }
 
         // l'image qui vole entre la miniature et la visionneuse
         if let Some(f) = &self.fly {

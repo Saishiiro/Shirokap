@@ -61,7 +61,8 @@ pub(crate) fn install_fonts_with(ctx: &egui::Context, cjk: bool) {
 #[derive(Clone, Copy)]
 pub(crate) struct Pal {
     pub(crate) dark: bool,
-    pub(crate) bg: Color32,
+    pub(crate) win: Color32, // fond de la fenêtre, derrière les panneaux flottants
+    pub(crate) bg: Color32,  // panneaux (barre latérale, feuille de contenu)
     pub(crate) side: Color32,
     pub(crate) card: Color32,
     pub(crate) input: Color32,
@@ -110,6 +111,8 @@ pub(crate) fn palette(theme: &str) -> Pal {
     // (sombre ?, fond, barre latérale, carte, champ, bouton, survol, trait, contour, contour survol, texte)
     let mk = |dark: bool, bg: [u8; 3], side: [u8; 3], card: [u8; 3], input: [u8; 3], button: [u8; 3], hover: [u8; 3], line: [u8; 3], si: [u8; 3], sh: [u8; 3], text: [u8; 3]| Pal {
         dark,
+        // un cran plus sombre que la barre latérale : les panneaux semblent posés dessus
+        win: col(side[0], side[1], side[2]).lerp_to_gamma(Color32::BLACK, if dark { 0.35 } else { 0.07 }),
         bg: col(bg[0], bg[1], bg[2]),
         side: col(side[0], side[1], side[2]),
         card: col(card[0], card[1], card[2]),
@@ -175,19 +178,22 @@ pub(crate) fn theme_card(ui: &mut egui::Ui, selected: bool, name: &str, pal: &Pa
         };
         p.add(sh.as_shape(rect, 10.0));
     }
-    p.rect_filled(rect, 10.0, pal.bg);
-    let side = Rect::from_min_max(rect.min, pos2(rect.min.x + 34.0, rect.max.y));
-    p.rect_filled(side, Rounding { nw: 10.0, sw: 10.0, ne: 0.0, se: 0.0 }, pal.side);
-    p.rect_filled(Rect::from_min_size(side.min + vec2(8.0, 12.0), vec2(18.0, 5.0)), 2.0, acc);
-    p.rect_filled(Rect::from_min_size(side.min + vec2(8.0, 24.0), vec2(18.0, 4.0)), 2.0, pal.line);
-    let card = Rect::from_min_max(rect.min + vec2(44.0, 10.0), pos2(rect.max.x - 10.0, rect.min.y + 52.0));
+    // mini-fenêtre : fond de la fenêtre, menu latéral et feuille de contenu en panneaux arrondis
+    p.rect_filled(rect, 10.0, pal.win);
+    let side = Rect::from_min_max(rect.min + vec2(4.0, 4.0), pos2(rect.min.x + 34.0, rect.max.y - 4.0));
+    p.rect_filled(side, 7.0, pal.bg);
+    p.rect_filled(Rect::from_min_size(side.min + vec2(5.0, 9.0), vec2(20.0, 7.0)), 3.5, acc);
+    p.rect_filled(Rect::from_min_size(side.min + vec2(5.0, 21.0), vec2(20.0, 4.0)), 2.0, pal.line);
+    let sheet = Rect::from_min_max(pos2(side.max.x + 4.0, rect.min.y + 4.0), rect.max - vec2(4.0, 4.0));
+    p.rect_filled(sheet, 7.0, pal.bg);
+    let card = Rect::from_min_max(sheet.min + vec2(7.0, 7.0), pos2(sheet.max.x - 7.0, sheet.min.y + 46.0));
     p.rect_filled(card, 6.0, pal.card);
     // au survol, la mini-interface « s'anime » : le bouton s'allonge, les lignes de texte se remplissent
     let inner_w = card.width() - 16.0;
     p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 8.0), vec2(34.0 + (inner_w - 34.0) * 0.45 * hk, 8.0)), 4.0, acc);
     p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 22.0), vec2(inner_w * (0.85 + 0.15 * hk), 4.0)), 2.0, pal.line);
     p.rect_filled(Rect::from_min_size(card.min + vec2(8.0, 31.0), vec2(inner_w * (0.6 + 0.3 * hk), 4.0)), 2.0, pal.line);
-    p.text(pos2(rect.min.x + 44.0, rect.max.y - 17.0), Align2::LEFT_CENTER, name, FontId::proportional(13.0), pal.text);
+    p.text(pos2(sheet.min.x + 8.0, rect.max.y - 16.0), Align2::LEFT_CENTER, name, FontId::proportional(13.0), pal.text);
     if let Some((pos, t0)) = ctx.data(|d| d.get_temp::<(Pos2, f64)>(rip_id)) {
         let e = ((now - t0) as f32 / 0.65).clamp(0.0, 1.0);
         if e < 1.0 {
@@ -221,6 +227,7 @@ pub(crate) fn lerp_pal(a: &Pal, b: &Pal, t: f32) -> Pal {
     let m = |x: Color32, y: Color32| x.lerp_to_gamma(y, t);
     Pal {
         dark: if t < 0.5 { a.dark } else { b.dark },
+        win: m(a.win, b.win),
         bg: m(a.bg, b.bg),
         side: m(a.side, b.side),
         card: m(a.card, b.card),
@@ -239,21 +246,21 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
     let (bg, card, input, hover, button, line, text) = (pal.bg, pal.card, pal.input, pal.hover, pal.button, pal.line, pal.text);
     let mut v = if pal.dark { egui::Visuals::dark() } else { egui::Visuals::light() };
     v.override_text_color = Some(text);
-    v.panel_fill = bg;
+    v.panel_fill = pal.win; // les panneaux arrondis (barre latérale, contenu) sont dessinés par-dessus
     v.window_fill = card;
     v.extreme_bg_color = input;
     v.faint_bg_color = card;
     v.window_stroke = Stroke::new(1.0_f32, line);
-    v.window_rounding = Rounding::same(14.0);
+    v.window_rounding = Rounding::same(16.0);
     // ombres douces sous les fenêtres et menus déroulants
     let sh = if pal.dark { 110 } else { 40 };
     v.window_shadow = egui::epaint::Shadow { offset: vec2(0.0, 10.0), blur: 32.0, spread: 0.0, color: Color32::from_black_alpha(sh) };
     v.popup_shadow = egui::epaint::Shadow { offset: vec2(0.0, 6.0), blur: 20.0, spread: 0.0, color: Color32::from_black_alpha(sh * 3 / 4) };
-    v.menu_rounding = Rounding::same(8.0);
+    v.menu_rounding = Rounding::same(12.0);
     v.selection.bg_fill = acc;
     v.selection.stroke = Stroke::new(1.0_f32, on_accent(acc));
     v.hyperlink_color = acc;
-    let round = Rounding::same(8.0);
+    let round = Rounding::same(12.0);
     for (w, fill) in [
         (&mut v.widgets.inactive, button),
         (&mut v.widgets.hovered, hover),
@@ -267,7 +274,8 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
         w.expansion = 0.0;
     }
     let (s_in, s_hov) = (pal.stroke_in, pal.stroke_hov);
-    v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, s_in); // cases, radios, champs et boutons visibles
+    // contours discrets : un fin trait suffit à distinguer les champs et les cases du fond
+    v.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, line.lerp_to_gamma(s_in, 0.5));
     v.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, s_hov);
     v.slider_trailing_fill = true;
     v.widgets.active.fg_stroke = Stroke::new(1.5_f32, on_accent(acc));
@@ -282,8 +290,8 @@ pub(crate) fn apply_style_with(ctx: &egui::Context, pal: &Pal, acc: Color32) {
         // plus claire au survol, couleur d'accent quand on la fait glisser
         s.spacing.scroll.foreground_color = false;
         s.spacing.item_spacing = vec2(10.0, 10.0);
-        s.spacing.button_padding = vec2(14.0, 7.0);
-        s.spacing.interact_size.y = 30.0;
+        s.spacing.button_padding = vec2(16.0, 8.0);
+        s.spacing.interact_size.y = 32.0;
         s.spacing.slider_width = 180.0;
         s.text_styles.insert(TextStyle::Body, FontId::proportional(15.0));
         s.text_styles.insert(TextStyle::Button, FontId::proportional(15.0));
@@ -303,9 +311,9 @@ pub(crate) fn ic(icon: &str, label: &str) -> String {
     format!("{icon}  {label}")
 }
 
-/// Bouton carré avec une seule icône (barre latérale réduite, barres d'outils). `on` : état actif (teinté).
+/// Bouton rond avec une seule icône (barre latérale réduite). `on` : état actif (rempli de la couleur d'accent).
 pub(crate) fn icon_button(ui: &mut egui::Ui, icon: &str, on: bool) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(34.0, 34.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width().max(34.0), 40.0), Sense::click());
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
@@ -315,67 +323,177 @@ pub(crate) fn icon_button(ui: &mut egui::Ui, icon: &str, on: bool) -> egui::Resp
     let acc = v.selection.bg_fill;
     let p = ui.painter();
     if hk * (1.0 - sk) > 0.01 {
-        p.rect_filled(rect, 9.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
+        p.rect_filled(rect, 20.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
     }
     if sk > 0.01 {
-        p.rect_filled(rect, 9.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), (55.0 * sk) as u8));
+        p.rect_filled(rect, 20.0, acc.gamma_multiply(sk));
     }
-    let col = v.text_color().lerp_to_gamma(acc, 0.35 * sk);
+    let col = v.weak_text_color().lerp_to_gamma(v.text_color(), hk).lerp_to_gamma(on_accent(acc), sk);
     p.text(rect.center(), Align2::CENTER_CENTER, icon, FontId::proportional(18.0), col);
     resp
 }
 
 /// Petit bouton « panneau latéral », pour ouvrir / réduire le menu.
 pub(crate) fn sidebar_icon_button(ui: &mut egui::Ui) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(32.0, 32.0), Sense::click());
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     let hover = ui.visuals().widgets.hovered.weak_bg_fill;
-    let color = ui.visuals().text_color();
+    let color = ui.visuals().weak_text_color().lerp_to_gamma(ui.visuals().text_color(), 0.5);
     let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let p = ui.painter();
     if hk > 0.01 {
-        p.rect_filled(rect, 8.0, hover.gamma_multiply(hk));
+        p.rect_filled(rect, 16.0, hover.gamma_multiply(hk));
     }
-    p.text(rect.center(), Align2::CENTER_CENTER, crate::icons::SIDEBAR, FontId::proportional(18.0), color);
+    p.text(rect.center(), Align2::CENTER_CENTER, crate::icons::SIDEBAR, FontId::proportional(17.0), color);
     resp
 }
 
-/// Entrée de la barre latérale : fond teinté + liseré d'accent quand elle est active.
+/// Logo de l'application : un losange creux dans une tuile teintée de la couleur d'accent.
+pub(crate) fn logo_mark(ui: &mut egui::Ui, acc: Color32) {
+    let (rect, _) = ui.allocate_exact_size(vec2(30.0, 30.0), Sense::hover());
+    let p = ui.painter();
+    p.rect_filled(rect, 9.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 46));
+    let (c, r) = (rect.center(), 8.5);
+    let pts = vec![c + vec2(0.0, -r), c + vec2(r, 0.0), c + vec2(0.0, r), c + vec2(-r, 0.0)];
+    p.add(egui::Shape::closed_line(pts, Stroke::new(2.2_f32, acc)));
+}
+
+/// Entrée de la barre latérale : une pilule qui se remplit de la couleur d'accent quand elle est active.
 pub(crate) fn nav_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, tab: T, icon: &str, label: &str) {
     let selected = *cur == tab;
-    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 42.0), Sense::click());
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    // survol en fondu ; l'entrée active se teinte, son liseré grandit et le texte se décale un peu
+    // survol en fondu ; la pilule active se remplit en s'élargissant depuis la gauche
     let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
     let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
     let v = ui.visuals();
     let acc = v.selection.bg_fill;
-    let hover = v.widgets.hovered.weak_bg_fill;
-    let txt = v.text_color();
     let p = ui.painter();
     if hk * (1.0 - sk) > 0.01 {
-        p.rect_filled(rect, 8.0, hover.gamma_multiply(hk * (1.0 - sk)));
+        p.rect_filled(rect, 21.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
     }
     if sk > 0.01 {
-        p.rect_filled(rect, 8.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), (45.0 * sk) as u8));
-        let h = (rect.height() - 18.0) * sk;
-        p.rect_filled(Rect::from_center_size(pos2(rect.min.x + 1.5, rect.center().y), vec2(3.0, h)), 2.0, acc);
+        let w = rect.height() + (rect.width() - rect.height()) * sk;
+        p.rect_filled(Rect::from_min_size(rect.min, vec2(w, rect.height())), 21.0, acc.gamma_multiply(sk));
     }
+    let fg = v.weak_text_color().lerp_to_gamma(v.text_color(), hk.max(0.0)).lerp_to_gamma(on_accent(acc), sk);
     let font = if selected {
         FontId::new(15.0, egui::FontFamily::Name("bold".into()))
     } else {
         FontId::proportional(15.0)
     };
-    let x = 14.0 + 3.0 * sk;
-    p.text(rect.left_center() + vec2(x, 0.0), Align2::LEFT_CENTER, icon, FontId::proportional(17.0), txt.lerp_to_gamma(acc, 0.4 * sk));
-    p.text(rect.left_center() + vec2(x + 28.0, 0.0), Align2::LEFT_CENTER, label, font, txt);
+    p.text(rect.left_center() + vec2(16.0, 0.0), Align2::LEFT_CENTER, icon, FontId::proportional(17.0), fg);
+    p.text(rect.left_center() + vec2(44.0, 0.0), Align2::LEFT_CENTER, label, font, fg);
     if resp.clicked() {
         *cur = tab;
     }
+}
+
+/// Couleur propre à chaque rubrique des paramètres (tuile de son icône).
+pub(crate) fn cat_tint(i: usize) -> Color32 {
+    match i {
+        0 => col(56, 189, 248),  // raccourcis : bleu ciel
+        1 => col(167, 139, 250), // capture : violet
+        2 => col(251, 191, 36),  // fichiers : ambre
+        3 => col(244, 114, 182), // apparence : rose
+        4 => col(52, 211, 153),  // confidentialité : vert
+        _ => col(148, 163, 184), // système : ardoise
+    }
+}
+
+/// Rubrique des paramètres : icône dans une tuile colorée, puis le nom. La rubrique active a un fond
+/// et sa tuile prend la couleur d'accent.
+pub(crate) fn cat_item<T: PartialEq + Copy>(ui: &mut egui::Ui, cur: &mut T, cat: T, icon: &str, label: &str, tint: Color32) {
+    let selected = *cur == cat;
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 44.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let sk = ui.ctx().animate_bool_with_time_and_easing(resp.id.with("sel"), selected, super::anim::PAGE, egui::emath::easing::cubic_out);
+    let v = ui.visuals();
+    let acc = v.selection.bg_fill;
+    let dark = v.dark_mode;
+    let p = ui.painter();
+    let row = v.faint_bg_color;
+    if hk * (1.0 - sk) > 0.01 {
+        p.rect_filled(rect, 12.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(0.6 * hk * (1.0 - sk)));
+    }
+    if sk > 0.01 {
+        p.rect_filled(rect, 12.0, row.gamma_multiply(sk));
+    }
+    let tile = Rect::from_center_size(rect.left_center() + vec2(24.0, 0.0), vec2(28.0, 28.0));
+    let soft = Color32::from_rgba_unmultiplied(tint.r(), tint.g(), tint.b(), if dark { 42 } else { 52 });
+    p.rect_filled(tile, 8.0, soft.gamma_multiply(1.0 - sk));
+    if sk > 0.01 {
+        p.rect_filled(tile, 8.0, acc.gamma_multiply(sk));
+    }
+    let tint_fg = if dark { tint.lerp_to_gamma(Color32::WHITE, 0.3) } else { tint.lerp_to_gamma(Color32::BLACK, 0.3) };
+    p.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), tint_fg.lerp_to_gamma(on_accent(acc), sk));
+    let font = if selected {
+        FontId::new(15.0, egui::FontFamily::Name("bold".into()))
+    } else {
+        FontId::proportional(15.0)
+    };
+    p.text(pos2(tile.max.x + 12.0, rect.center().y), Align2::LEFT_CENTER, label, font, v.text_color());
+    if resp.clicked() {
+        *cur = cat;
+    }
+}
+
+/// Petite étiquette de touche (« F11 », « Ctrl K »), calée à droite sur `right_center`. Renvoie sa place.
+pub(crate) fn kbd_chip(ui: &egui::Ui, right_center: Pos2, text: &str) -> Rect {
+    let v = ui.visuals();
+    let g = ui.painter().layout_no_wrap(text.to_owned(), FontId::proportional(11.5), v.weak_text_color());
+    let size = g.size() + vec2(16.0, 6.0);
+    let r = Rect::from_min_size(pos2(right_center.x - size.x, right_center.y - size.y / 2.0), size);
+    ui.painter().rect_filled(r, size.y / 2.0, v.widgets.inactive.weak_bg_fill);
+    ui.painter().galley(r.center() - g.size() / 2.0, g, v.weak_text_color());
+    r
+}
+
+/// Bouton pilule pleine largeur avec une icône, son nom et une étiquette de touche à droite (bas du menu).
+pub(crate) fn pill_button(ui: &mut egui::Ui, icon: &str, label: &str, key: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let v = ui.visuals();
+    let fill = v.faint_bg_color.lerp_to_gamma(v.widgets.hovered.weak_bg_fill, hk);
+    let txt = v.text_color();
+    ui.painter().rect_filled(rect, 20.0, fill);
+    ui.painter().text(rect.left_center() + vec2(15.0, 0.0), Align2::LEFT_CENTER, icon, FontId::proportional(15.0), txt);
+    ui.painter().text(rect.left_center() + vec2(39.0, 0.0), Align2::LEFT_CENTER, label, FontId::proportional(14.0), txt);
+    if !key.is_empty() {
+        kbd_chip(ui, rect.right_center() - vec2(9.0, 0.0), key);
+    }
+    resp
+}
+
+/// Barre « Rechercher une commande… » en haut à droite des pages : ouvre la palette de commandes.
+pub(crate) fn command_bar(ui: &mut egui::Ui, width: f32) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 40.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), super::anim::HOVER);
+    let v = ui.visuals();
+    let fill = v.extreme_bg_color.lerp_to_gamma(v.widgets.hovered.weak_bg_fill, 0.4 * hk);
+    let weak = v.weak_text_color();
+    ui.painter().rect_filled(rect, 20.0, fill);
+    ui.painter().text(rect.left_center() + vec2(16.0, 0.0), Align2::LEFT_CENTER, crate::icons::COMMAND, FontId::proportional(15.0), weak);
+    let chip = kbd_chip(ui, rect.right_center() - vec2(8.0, 0.0), "Ctrl K");
+    let room = chip.min.x - rect.min.x - 48.0;
+    let g = ui.painter().layout(tr("Rechercher une commande…").to_owned(), FontId::proportional(13.5), weak, f32::INFINITY);
+    if g.size().x <= room {
+        ui.painter().galley(pos2(rect.min.x + 40.0, rect.center().y - g.size().y / 2.0), g, weak);
+    }
+    resp
 }
 
 pub(crate) fn tex(ctx: &egui::Context, name: &str, img: &image::RgbaImage) -> TextureHandle {

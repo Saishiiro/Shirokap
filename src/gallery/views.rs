@@ -29,8 +29,6 @@ impl App {
         let total: u64 = self.items.iter().map(|i| i.size).sum();
         let today = chrono::Local::now().date_naive();
         let day_of = |t: SystemTime| chrono::DateTime::<chrono::Local>::from(t).date_naive();
-        ui.label(bold_text(tr("Statistiques"), 24.0));
-        ui.add_space(4.0);
         if self.items.is_empty() {
             let text = trf("Appuie sur {0} pour capturer l'écran, ou {1} pour une zone : tes captures apparaîtront ici.", &[&self.cfg.hotkey, &self.cfg.hotkey_region]);
             if empty_view(ui, self.tab_at, self.shown_acc, icons::STATS, tr("Pas encore de statistiques"), &text, &ic(icons::GALLERY, tr("Aller à la galerie"))) {

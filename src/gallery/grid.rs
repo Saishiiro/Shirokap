@@ -92,9 +92,6 @@ impl App {
             ui.toggle_value(&mut self.favs_only, tr("★ Favoris"));
             ui.weak(tr("Taille"));
             ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false));
-            if ui.add(egui::Button::new(icons::COMMAND).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Palette de commandes (Ctrl+K)")).clicked() {
-                self.cmd = Some(palette::CmdPalette::new());
-            }
             if ui.add(egui::Button::new(icons::REFRESH).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Actualiser")).clicked() {
                 self.items = list_items(&self.cfg.save_dir);
             }

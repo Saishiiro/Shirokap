@@ -4,22 +4,38 @@ use super::*;
 impl App {
     // ----- paramètres -----
     pub(super) fn settings_ui(&mut self, ui: &mut egui::Ui) {
-        ui.label(bold_text(tr("Paramètres"), 24.0));
-        ui.add_space(6.0);
         egui::SidePanel::left("set_nav")
-            .exact_width(170.0)
+            .exact_width(210.0)
             .resizable(false)
+            .show_separator_line(false)
             .frame(egui::Frame::none())
             .show_inside(ui, |ui| {
-                for (c, i, n) in [
+                ui.spacing_mut().item_spacing.y = 2.0;
+                for (n, (c, i, name)) in [
                     (SetCat::Shortcuts, icons::KEYBOARD, tr("Raccourcis")),
                     (SetCat::Capture, icons::CAMERA, tr("Capture")),
                     (SetCat::Files, icons::FOLDER, tr("Fichiers")),
                     (SetCat::Look, icons::PALETTE, tr("Apparence")),
                     (SetCat::Privacy, icons::SHIELD, tr("Confidentialité")),
                     (SetCat::System, icons::SYSTEM, tr("Système")),
-                ] {
-                    nav_item(ui, &mut self.set_cat, c, i, n);
+                ]
+                .into_iter()
+                .enumerate()
+                {
+                    cat_item(ui, &mut self.set_cat, c, i, name, cat_tint(n));
+                }
+                ui.add_space(14.0);
+                // remet toutes les rubriques à zéro (rien n'est appliqué avant « Enregistrer »)
+                let reset = egui::Button::new(egui::RichText::new(ic(icons::RESET, tr("Tout réinitialiser"))).size(13.5))
+                    .fill(Color32::TRANSPARENT)
+                    .stroke(Stroke::NONE)
+                    .rounding(18.0);
+                if ui
+                    .add(reset)
+                    .on_hover_text(tr("Remet TOUS les réglages de TOUTES les rubriques à leur valeur d'origine. Rien n'est appliqué tant que tu n'as pas cliqué sur « Enregistrer » (« Annuler » permet de revenir en arrière)."))
+                    .clicked()
+                {
+                    self.cfg = Config::default();
                 }
             });
         // changement de rubrique : le contenu arrive en fondu depuis la droite
@@ -34,13 +50,16 @@ impl App {
         let pad = egui::Margin { left: 18.0 + 28.0 * (1.0 - k), right: 0.0, top: 0.0, bottom: 0.0 };
         egui::Frame::none().inner_margin(pad).show(ui, |ui| {
             ui.multiply_opacity(k);
-            egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| match self.set_cat {
-                SetCat::Shortcuts => self.set_shortcuts(ui),
-                SetCat::Capture => self.set_capture(ui),
-                SetCat::Files => self.set_files(ui),
-                SetCat::Look => self.set_look(ui),
-                SetCat::Privacy => self.set_privacy(ui),
-                SetCat::System => self.set_system(ui),
+            egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+                match self.set_cat {
+                    SetCat::Shortcuts => self.set_shortcuts(ui),
+                    SetCat::Capture => self.set_capture(ui),
+                    SetCat::Files => self.set_files(ui),
+                    SetCat::Look => self.set_look(ui),
+                    SetCat::Privacy => self.set_privacy(ui),
+                    SetCat::System => self.set_system(ui),
+                }
+                ui.add_space(70.0); // place pour la pilule d'enregistrement, qui flotte en bas
             });
         });
     }
