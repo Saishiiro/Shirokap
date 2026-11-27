@@ -163,7 +163,7 @@ pub fn color_button(ui: &mut egui::Ui, id: &str, rgb: &mut [u8; 3]) -> bool {
                                 changed = true;
                             }
                         }
-                        if ui.button(tr("Copier")).on_hover_text(tr("Copier le code de la couleur")).clicked() {
+                        if ui.button(format!("{}  {}", crate::icons::COPY, tr("Copier"))).on_hover_text(tr("Copier le code de la couleur")).clicked() {
                             ui.ctx().copy_text(hex_of(*rgb));
                         }
                     });

@@ -47,10 +47,13 @@ impl App {
                     .rounding(24.0)
                     .stroke(Stroke::new(1.0_f32, ui.visuals().widgets.noninteractive.bg_stroke.color))
                     .shadow(egui::epaint::Shadow { offset: vec2(0.0, 18.0), blur: 56.0, spread: 0.0, color: Color32::from_black_alpha(if dark { 170 } else { 70 }) })
-                    .inner_margin(egui::Margin::same(28.0))
+                    // marge droite plus courte : la barre de défilement (si la fenêtre est basse) loge
+                    // dans la gouttière réservée à droite du contenu, sans le chevaucher
+                    .inner_margin(egui::Margin { left: 28.0, right: 12.0, top: 28.0, bottom: 28.0 })
                     .show(ui, |ui| {
-                        ui.set_width(w - 56.0);
+                        ui.set_width(w - 40.0);
                         egui::ScrollArea::vertical().max_height(screen.height() - 120.0).auto_shrink([false, true]).show(ui, |ui| {
+                            ui.set_max_width(ui.available_width() - 16.0);
                             self.welcome_body(ui, &keys, &mut start, &mut custom, &mut change, &mut theme, &mut lang);
                         });
                     });
@@ -122,8 +125,9 @@ impl App {
                 }
             };
             egui::ComboBox::new("welcome_lang", "").width(260.0).selected_text(name(&self.cfg.language)).show_ui(ui, |ui| {
+                ui.spacing_mut().item_spacing.y = 2.0;
                 for (code, _, _) in LANGUAGES {
-                    if ui.selectable_label(self.cfg.language == code, name(code)).clicked() {
+                    if menu_item(ui, "", &name(code), self.cfg.language == code, "").clicked() {
                         *lang = Some(code);
                     }
                 }

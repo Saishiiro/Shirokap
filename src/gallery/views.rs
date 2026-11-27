@@ -281,55 +281,33 @@ impl App {
                             del = true;
                         }
                         dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
-                            ui.set_min_width(250.0);
-                            if ui.button(ic(icons::RENAME, tr("Renommer"))).clicked() {
-                                ren = true;
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::PIN, tr("Épingler à l'écran"))).clicked() {
-                                pin = true;
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::EDIT_EXT, tr("Modifier dans l'éditeur externe"))).clicked() {
-                                edit = true;
-                                ui.close_menu();
-                            }
+                            let item = |ui: &mut egui::Ui, icon: &str, label: &str, key: &str, flag: &mut bool| {
+                                if menu_item(ui, icon, label, false, key).clicked() {
+                                    *flag = true;
+                                    close_dropdown(ui);
+                                }
+                            };
+                            item(ui, icons::RENAME, tr("Renommer"), "", &mut ren);
+                            item(ui, icons::PIN, tr("Épingler à l'écran"), "", &mut pin);
+                            item(ui, icons::EDIT_EXT, tr("Modifier dans l'éditeur externe"), "", &mut edit);
                             ui.separator();
-                            if ui.button(ic(icons::EXTERNAL, tr("Ouvrir avec l'application par défaut"))).clicked() {
-                                open_ext = true;
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::FOLDER_OPEN, tr("Afficher dans le dossier"))).clicked() {
-                                show_dir = true;
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::FOLDER, tr("Copier le fichier"))).clicked() {
-                                cfile = true;
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::LINK, tr("Copier le chemin"))).clicked() {
-                                cpath = true;
-                                ui.close_menu();
-                            }
+                            item(ui, icons::EXTERNAL, tr("Ouvrir avec l'application par défaut"), "", &mut open_ext);
+                            item(ui, icons::FOLDER_OPEN, tr("Afficher dans le dossier"), "", &mut show_dir);
+                            item(ui, icons::FOLDER, tr("Copier le fichier"), "", &mut cfile);
+                            item(ui, icons::LINK, tr("Copier le chemin"), "", &mut cpath);
                             ui.separator();
-                            let ss = egui::Button::new(if slideshow { ic(icons::PAUSE, tr("Arrêter le diaporama")) } else { ic(icons::PLAY, tr("Diaporama")) })
-                                .shortcut_text(tr("Espace"));
-                            if ui.add(ss).clicked() {
-                                toggle_show = true;
-                                ui.close_menu();
-                            }
-                            ui.label(egui::RichText::new(tr("Ordre du diaporama")).size(12.5).color(ui.visuals().weak_text_color()));
-                            if ui.radio(!new_first, tr("Du plus ancien au plus récent")).clicked() {
+                            let (si, sl) = if slideshow { (icons::PAUSE, tr("Arrêter le diaporama")) } else { (icons::PLAY, tr("Diaporama")) };
+                            item(ui, si, sl, tr("Espace"), &mut toggle_show);
+                            // ordre du diaporama : la liste reste ouverte pour voir le choix
+                            menu_label(ui, tr("Ordre du diaporama"));
+                            if menu_item(ui, icons::OLDEST, tr("Du plus ancien au plus récent"), !new_first, "").clicked() {
                                 new_first = false;
                             }
-                            if ui.radio(new_first, tr("Du plus récent au plus ancien")).clicked() {
+                            if menu_item(ui, icons::NEWEST, tr("Du plus récent au plus ancien"), new_first, "").clicked() {
                                 new_first = true;
                             }
                             ui.separator();
-                            if ui.add(egui::Button::new(ic(icons::FULLSCREEN, tr("Plein écran"))).shortcut_text("F11")).clicked() {
-                                toggle_full = true;
-                                ui.close_menu();
-                            }
+                            item(ui, icons::FULLSCREEN, tr("Plein écran"), "F11", &mut toggle_full);
                         });
                     },
                 );

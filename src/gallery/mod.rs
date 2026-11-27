@@ -1,6 +1,6 @@
 use crate::common::*;
 use crate::i18n::*;
-use crate::editor::{self, dropdown, Editor};
+use crate::editor::{self, Editor};
 use crate::picker::{color_button, on_accent};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 use eframe::egui::{
@@ -188,6 +188,7 @@ impl App {
     fn new(ctx: &egui::Context, settings: bool, hwnd: isize) -> Self {
         let cfg = Config::load();
         let ui_state = load_ui();
+        let _ = std::fs::remove_file(gallery_cmd_path()); // pas de vieille demande oubliée
         install_fonts(ctx);
         apply_style(ctx, &cfg);
         Self {
@@ -540,6 +541,17 @@ impl eframe::App for App {
 
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
+        // demande du tray quand la galerie est déjà ouverte (« Paramètres… ») : le démon dépose un
+        // fichier puis met la fenêtre au premier plan, ce qui la redessine
+        if let Ok(c) = std::fs::read_to_string(gallery_cmd_path()) {
+            let _ = std::fs::remove_file(gallery_cmd_path());
+            if c.trim() == "settings" {
+                if self.fullscreen && self.view.is_some() {
+                    self.toggle_fullscreen(ctx); // visionneuse en plein écran : on en sort d'abord
+                }
+                self.tab = Tab::Settings;
+            }
+        }
 
         // F11 : plein écran depuis n'importe quel écran ; Échap en sort (hors visionneuse, qui gère son propre Échap)
         if ctx.input(|i| i.key_pressed(Key::F11)) {
@@ -642,14 +654,14 @@ impl eframe::App for App {
                 .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
                 .show(ctx, |ui| {
                     ui.weak(file_name(path.as_path()));
-                    let r = ui.add(egui::TextEdit::singleline(buf).desired_width(360.0));
+                    let r = field(ui, buf, "", 360.0);
                     r.request_focus();
                     let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
                     ui.horizontal(|ui| {
-                        if ui.button(tr("Renommer")).clicked() || enter {
+                        if accent_pill(ui, icons::RENAME, tr("Renommer")).clicked() || enter {
                             do_rename = Some((path.clone(), buf.clone()));
                         }
-                        if ui.button(tr("Annuler")).clicked() {
+                        if ghost(ui, "", tr("Annuler")).clicked() {
                             close = true;
                         }
                     });

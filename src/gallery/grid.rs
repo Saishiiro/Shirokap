@@ -84,10 +84,15 @@ impl App {
                         Sort::Size => tr("Taille"),
                     };
                     dropdown(ui, &ic(icons::SORT, sort_name), false, |ui| {
-                        for (s, n) in [(Sort::Newest, tr("Plus récentes")), (Sort::Oldest, tr("Plus anciennes")), (Sort::Name, tr("Nom")), (Sort::Size, tr("Taille"))] {
-                            if ui.selectable_label(self.sort == s, n).clicked() {
+                        for (s, i, n) in [
+                            (Sort::Newest, icons::NEWEST, tr("Plus récentes")),
+                            (Sort::Oldest, icons::OLDEST, tr("Plus anciennes")),
+                            (Sort::Name, icons::SORT_NAME, tr("Nom")),
+                            (Sort::Size, icons::SORT_SIZE, tr("Taille")),
+                        ] {
+                            if menu_item(ui, i, n, self.sort == s, "").clicked() {
                                 self.sort = s;
-                                ui.close_menu();
+                                close_dropdown(ui);
                             }
                         }
                     });
@@ -126,16 +131,19 @@ impl App {
                 } else {
                     let shown = if self.folder.is_empty() { tr("Tous les dossiers").to_string() } else { self.folder.clone() };
                     dropdown(ui, &ic(icons::FOLDER, &shown), !self.folder.is_empty(), |ui| {
-                        if ui.selectable_label(self.folder.is_empty(), tr("Tous les dossiers")).clicked() {
+                        if menu_item(ui, icons::FOLDERS, tr("Tous les dossiers"), self.folder.is_empty(), "").clicked() {
                             self.folder.clear();
-                            ui.close_menu();
+                            close_dropdown(ui);
                         }
-                        for f in &folders {
-                            if ui.selectable_label(self.folder == *f, f).clicked() {
-                                self.folder = f.clone();
-                                ui.close_menu();
+                        ui.separator();
+                        egui::ScrollArea::vertical().max_height(360.0).show(ui, |ui| {
+                            for f in &folders {
+                                if menu_item(ui, icons::FOLDER, f, self.folder == *f, "").clicked() {
+                                    self.folder = f.clone();
+                                    close_dropdown(ui);
+                                }
                             }
-                        }
+                        });
                     });
                 }
                 if fav_chip(ui, self.favs_only, tr("Favoris")).clicked() {
@@ -444,43 +452,37 @@ impl App {
 
                         ui.set_opacity(op0);
                         resp.context_menu(|ui| {
-                            if ui.button(ic(icons::COPY, tr("Copier l'image"))).clicked() {
-                                acts.push(Act::Copy(path.clone()));
-                                ui.close_menu();
+                            ui.spacing_mut().item_spacing.y = 2.0;
+                            let fav_label = if fav { tr("Retirer des favoris") } else { tr("★ Ajouter aux favoris").trim_start_matches("★ ") };
+                            // trois groupes : l'essentiel, le fichier, puis la corbeille (en rouge)
+                            let groups: [Vec<(&str, &str, Act)>; 2] = [
+                                vec![
+                                    (icons::COPY, tr("Copier l'image"), Act::Copy(path.clone())),
+                                    (if fav { icons::STAR_OFF } else { icons::STAR }, fav_label, Act::Fav(path.clone())),
+                                    (icons::RENAME, tr("Renommer…"), Act::Rename(path.clone())),
+                                    (icons::ANNOTATE, tr("Annoter (éditeur intégré)"), Act::Annotate(path.clone())),
+                                    (icons::PIN, tr("Épingler à l'écran"), Act::Pin(path.clone())),
+                                ],
+                                vec![
+                                    (icons::FOLDER, tr("Copier le fichier"), Act::CopyFile(path.clone())),
+                                    (icons::LINK, tr("Copier le chemin"), Act::Path(path.clone())),
+                                    (icons::EDIT_EXT, tr("Modifier dans l'éditeur"), Act::Edit(path.clone())),
+                                    (icons::FOLDER_OPEN, tr("Afficher dans le dossier"), Act::Reveal(path.clone())),
+                                ],
+                            ];
+                            for (n, group) in groups.into_iter().enumerate() {
+                                if n > 0 {
+                                    ui.separator();
+                                }
+                                for (icon, label, act) in group {
+                                    if menu_item(ui, icon, label, false, "").clicked() {
+                                        acts.push(act);
+                                        ui.close_menu();
+                                    }
+                                }
                             }
-                            if ui.button(if fav { tr("Retirer des favoris") } else { tr("★ Ajouter aux favoris") }).clicked() {
-                                acts.push(Act::Fav(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::RENAME, tr("Renommer…"))).clicked() {
-                                acts.push(Act::Rename(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::ANNOTATE, tr("Annoter (éditeur intégré)"))).clicked() {
-                                acts.push(Act::Annotate(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::PIN, tr("Épingler à l'écran"))).clicked() {
-                                acts.push(Act::Pin(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::FOLDER, tr("Copier le fichier"))).clicked() {
-                                acts.push(Act::CopyFile(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::EDIT_EXT, tr("Modifier dans l'éditeur"))).clicked() {
-                                acts.push(Act::Edit(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::LINK, tr("Copier le chemin"))).clicked() {
-                                acts.push(Act::Path(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::FOLDER_OPEN, tr("Afficher dans le dossier"))).clicked() {
-                                acts.push(Act::Reveal(path.clone()));
-                                ui.close_menu();
-                            }
-                            if ui.button(ic(icons::TRASH, tr("Mettre à la corbeille"))).clicked() {
+                            ui.separator();
+                            if menu_item_colored(ui, icons::TRASH, tr("Mettre à la corbeille"), false, "", Some(col(239, 68, 68))).clicked() {
                                 acts.push(Act::Trash(vec![path.clone()]));
                                 ui.close_menu();
                             }

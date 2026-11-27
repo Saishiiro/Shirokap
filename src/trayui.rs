@@ -65,6 +65,8 @@ fn card_need_w(ctx: &egui::Context, items: &[It]) -> f32 {
                     w(hint, 12.0) + 16.0 + 14.0
                 } else if checked.is_some() && !is_radio(id) {
                     48.0
+                } else if checked.is_some() {
+                    34.0
                 } else {
                     12.0
                 };
@@ -99,10 +101,10 @@ fn model(cfg: &Config, paused: bool, auto: bool) -> Vec<It> {
     let today = today_label(today_count(cfg));
     let tile = |id: &str, icon: &'static str, label: &str| (id.to_string(), icon, label.to_string());
     let mut quick = vec![
-        chk("tog_clip", "", tr("Copier dans le presse-papiers"), cfg.clipboard),
-        chk("tog_sound", "", tr("Bip sonore"), cfg.sound),
-        chk("tog_flash", "", tr("Clignotement de l'icône"), cfg.flash),
-        chk("tog_folder", "", tr("Un dossier par fenêtre / jeu"), cfg.folder_per_window),
+        chk("tog_clip", icons::CLIPBOARD, tr("Copier dans le presse-papiers"), cfg.clipboard),
+        chk("tog_sound", icons::SOUND, tr("Bip sonore"), cfg.sound),
+        chk("tog_flash", icons::FLASH, tr("Clignotement de l'icône"), cfg.flash),
+        chk("tog_folder", icons::FOLDER_TREE, tr("Un dossier par fenêtre / jeu"), cfg.folder_per_window),
         It::Sep,
     ];
     for (w, l) in [
@@ -112,7 +114,7 @@ fn model(cfg: &Config, paused: bool, auto: bool) -> Vec<It> {
         (1920, "1080p · 1920 px"),
         (1280, "720p · 1280 px"),
     ] {
-        quick.push(chk(&format!("res:{w}"), "", l, cfg.target_width == w));
+        quick.push(chk(&format!("res:{w}"), icons::MONITOR, l, cfg.target_width == w));
     }
     vec![
         It::Header { sub: today, paused },
@@ -293,6 +295,13 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, logo: Option<&TextureHa
                 let radio = is_radio(id);
                 if !icon.is_empty() {
                     p.text(pos2(row.min.x + 15.0, row.center().y), Align2::LEFT_CENTER, *icon, icon_font.clone(), if on { readable(acc, pal.bg, t) } else { t });
+                    if on && radio {
+                        // option choisie parmi plusieurs : coche à droite
+                        let c = pos2(row.max.x - 17.0, row.center().y);
+                        let st = Stroke::new(2.0_f32, readable(acc, pal.bg, t));
+                        p.line_segment([c + vec2(-4.5, 0.5), c + vec2(-1.5, 3.5)], st);
+                        p.line_segment([c + vec2(-1.5, 3.5), c + vec2(4.5, -3.5)], st);
+                    }
                 } else if on && radio {
                     let c = pos2(row.min.x + 17.0, row.center().y);
                     let st = Stroke::new(2.0_f32, readable(acc, pal.bg, t));
@@ -311,6 +320,8 @@ fn draw_card(ui: &mut egui::Ui, pal: &Pal, acc: Color32, logo: Option<&TextureHa
                 } else if checked.is_some() && !radio {
                     switch(p, pos2(row.max.x - 26.0, row.center().y), on, pal, acc);
                     right = row.max.x - 52.0;
+                } else if radio && !icon.is_empty() {
+                    right = row.max.x - 34.0;
                 }
                 let g = fit(p, label, FontId::proportional(14.5), t, right - (row.min.x + gutter));
                 p.galley(pos2(row.min.x + gutter, row.center().y - g.size().y / 2.0), g, t);

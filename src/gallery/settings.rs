@@ -199,8 +199,11 @@ impl App {
                         _ => "720p · 1280 px",
                     };
                     egui::ComboBox::new("res", "").width(220.0).selected_text(label(c.target_width)).show_ui(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
                         for w in [0u32, 3840, 2560, 1920, 1280] {
-                            ui.selectable_value(&mut c.target_width, w, label(w));
+                            if menu_item(ui, icons::MONITOR, label(w), c.target_width == w, "").clicked() {
+                                c.target_width = w;
+                            }
                         }
                     });
                 },
@@ -504,8 +507,11 @@ impl App {
                         }
                     };
                     egui::ComboBox::new("lang", "").width(260.0).selected_text(name(&self.cfg.language)).show_ui(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
                         for (code, _, _) in LANGUAGES {
-                            ui.selectable_value(&mut self.cfg.language, code.to_string(), name(code));
+                            if menu_item(ui, "", &name(code), self.cfg.language == code, "").clicked() {
+                                self.cfg.language = code.to_string();
+                            }
                         }
                     });
                 },

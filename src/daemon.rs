@@ -19,6 +19,7 @@ use tray_icon::{
 use windows_sys::Win32::{
     Foundation::{CloseHandle, GetLastError, POINT, RECT},
     Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS},
+    Graphics::Gdi::InvalidateRect,
     System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION},
     UI::WindowsAndMessaging::{
         AllowSetForegroundWindow, EnumWindows, FindWindowW, GetCursorPos, GetForegroundWindow, GetWindowRect, GetWindowTextW,
@@ -390,12 +391,17 @@ fn focus_gallery() {
         if !h.is_null() {
             ShowWindow(h, SW_RESTORE);
             SetForegroundWindow(h);
+            InvalidateRect(h, std::ptr::null(), 0); // la fait se redessiner (et lire une éventuelle demande)
         }
     }
 }
 
 fn open_gallery(child: &mut Option<Child>, settings: bool) {
     if running(child) {
+        if settings {
+            // la galerie déjà ouverte passe sur les paramètres en lisant ce fichier
+            let _ = std::fs::write(gallery_cmd_path(), "settings");
+        }
         focus_gallery();
         return;
     }

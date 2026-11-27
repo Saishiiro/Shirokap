@@ -544,6 +544,128 @@ pub(crate) fn pill_button(ui: &mut egui::Ui, icon: &str, label: &str, key: &str)
     resp
 }
 
+/// Drapeau « fermer le menu déroulant ouvert », posé par `close_dropdown`.
+fn dropdown_close_id() -> egui::Id {
+    egui::Id::new("dropdown_close")
+}
+
+/// Ferme le menu déroulant (`dropdown`) ouvert après le choix d'une ligne. À n'appeler que depuis
+/// le contenu d'un `dropdown` (le menu du clic droit d'egui se ferme avec `ui.close_menu()`).
+pub(crate) fn close_dropdown(ui: &mut egui::Ui) {
+    ui.ctx().data_mut(|d| d.insert_temp(dropdown_close_id(), true));
+}
+
+/// Bouton pilule avec une petite flèche, qui ouvre une liste en dessous. La liste garde une marge
+/// avec les bords de la fenêtre : si elle dépasserait à droite, elle se cale sous le bord droit du bouton.
+/// Les lignes appellent `close_dropdown` pour la refermer (un clic ailleurs ou Échap la ferment aussi).
+pub(crate) fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&mut egui::Ui)) {
+    let acc = accent_of(ui.visuals());
+    // espaces insécables en fin de libellé : ils réservent la place de la flèche dessinée ensuite
+    let txt = format!("{label}\u{00A0}\u{00A0}\u{00A0}\u{00A0}\u{00A0}");
+    let btn = if active {
+        egui::Button::new(egui::RichText::new(txt).color(on_accent(acc))).fill(acc).stroke(Stroke::NONE)
+    } else {
+        egui::Button::new(txt).stroke(Stroke::NONE)
+    };
+    let resp = ui.add(btn.min_size(vec2(0.0, 36.0)).rounding(18.0));
+    let id = resp.id.with("dropdown");
+    let ctx = ui.ctx().clone();
+    let mut open = ctx.memory(|m| m.is_popup_open(id));
+    if resp.clicked() {
+        ctx.memory_mut(|m| m.toggle_popup(id));
+        ctx.data_mut(|d| d.remove_temp::<bool>(dropdown_close_id()));
+        open = !open;
+    }
+    if resp.hovered() {
+        ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    // flèche : vers le bas, ou vers le haut quand la liste est ouverte
+    let rect = resp.rect;
+    let c = pos2(rect.right() - 20.0, rect.center().y + 1.0);
+    let col = if active { on_accent(acc) } else { ui.visuals().text_color() };
+    let st = Stroke::new(1.7_f32, col);
+    let d = if open { -1.0 } else { 1.0 };
+    ui.painter().line_segment([c + vec2(-4.0, -2.0 * d), c + vec2(0.0, 2.0 * d)], st);
+    ui.painter().line_segment([c + vec2(0.0, 2.0 * d), c + vec2(4.0, -2.0 * d)], st);
+    if !open {
+        return;
+    }
+    let screen = ctx.screen_rect();
+    let margin = 10.0;
+    let w = ctx.data(|d| d.get_temp::<f32>(id.with("w"))).unwrap_or(220.0);
+    let x = if rect.left() + w > screen.right() - margin { rect.right() - w } else { rect.left() };
+    let pos = pos2(x.max(screen.left() + margin), rect.bottom() + 6.0);
+    let shown = egui::Area::new(id)
+        .kind(egui::UiKind::Menu)
+        .order(egui::Order::Foreground)
+        .fixed_pos(pos)
+        .constrain_to(screen.shrink(margin))
+        .show(&ctx, |ui| {
+            egui::Frame::menu(ui.style()).show(ui, |ui| {
+                ui.set_min_width((rect.width() - 12.0).max(160.0));
+                ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+                    ui.spacing_mut().item_spacing.y = 2.0;
+                    add(ui);
+                });
+            });
+        });
+    let r = shown.response.rect;
+    ctx.data_mut(|d| d.insert_temp(id.with("w"), r.width()));
+    let picked = ctx.data_mut(|d| d.remove_temp::<bool>(dropdown_close_id())).unwrap_or(false);
+    let outside = ctx.input(|i| i.pointer.any_click() && i.pointer.interact_pos().map(|p| !r.contains(p) && !rect.contains(p)).unwrap_or(false));
+    // Échap ferme la liste sans fermer aussi la page en dessous (visionneuse…)
+    let esc = ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+    if picked || outside || esc {
+        ctx.memory_mut(|m| m.close_popup());
+    }
+}
+
+/// Ligne d'un menu : icône, libellé, et à droite une coche (option choisie) ou une touche.
+pub(crate) fn menu_item(ui: &mut egui::Ui, icon: &str, label: &str, selected: bool, key: &str) -> egui::Response {
+    menu_item_colored(ui, icon, label, selected, key, None)
+}
+
+/// Comme `menu_item`, avec une couleur propre (rouge pour la corbeille…).
+pub(crate) fn menu_item_colored(ui: &mut egui::Ui, icon: &str, label: &str, selected: bool, key: &str, color: Option<Color32>) -> egui::Response {
+    let font = if selected { FontId::new(14.5, egui::FontFamily::Name("bold".into())) } else { FontId::proportional(14.5) };
+    let g = ui.painter().layout_no_wrap(label.to_owned(), font, Color32::PLACEHOLDER);
+    let key_w = if key.is_empty() { 0.0 } else { ui.painter().layout_no_wrap(key.to_owned(), FontId::proportional(11.5), Color32::PLACEHOLDER).size().x + 16.0 };
+    let left = if icon.is_empty() { 12.0 } else { 40.0 };
+    let right = if key_w > 0.0 { key_w + 26.0 } else { 36.0 };
+    let (rect, resp) = ui.allocate_at_least(vec2(left + g.size().x + right, 34.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), 0.12);
+    let v = ui.visuals();
+    let acc = accent_of(v);
+    let p = ui.painter();
+    if selected {
+        p.rect_filled(rect, 9.0, acc.gamma_multiply(if v.dark_mode { 0.22 } else { 0.15 }));
+    }
+    if hk > 0.01 {
+        p.rect_filled(rect, 9.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * if selected { 0.5 } else { 1.0 }));
+    }
+    let text = color.unwrap_or(v.text_color());
+    if !icon.is_empty() {
+        let ic_col = color.unwrap_or(if selected { v.text_color() } else { v.weak_text_color().lerp_to_gamma(v.text_color(), 0.35 + 0.65 * hk) });
+        p.text(pos2(rect.min.x + 14.0, rect.center().y), Align2::LEFT_CENTER, icon, FontId::proportional(15.5), ic_col);
+    }
+    p.galley(pos2(rect.min.x + left, rect.center().y - g.size().y / 2.0), g, text);
+    if selected {
+        icon_check(p, pos2(rect.right() - 18.0, rect.center().y), v.text_color());
+    } else if !key.is_empty() {
+        kbd_chip(ui, rect.right_center() - vec2(8.0, 0.0), key);
+    }
+    resp
+}
+
+/// Petit titre de section dans un menu.
+pub(crate) fn menu_label(ui: &mut egui::Ui, text: &str) {
+    let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 26.0), Sense::hover());
+    ui.painter().text(pos2(r.min.x + 12.0, r.max.y - 9.0), Align2::LEFT_CENTER, text, FontId::new(12.0, egui::FontFamily::Name("bold".into())), ui.visuals().weak_text_color());
+}
+
 /// Barre « Rechercher une commande… » en haut à droite des pages : ouvre la palette de commandes.
 pub(crate) fn command_bar(ui: &mut egui::Ui, width: f32) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 40.0), Sense::click());

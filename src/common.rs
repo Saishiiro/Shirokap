@@ -168,6 +168,10 @@ pub fn config_path() -> PathBuf {
 pub fn popup_cmd_path() -> PathBuf {
     proj().data_local_dir().join("popup_cmd.txt")
 }
+/// Demande déposée pour la galerie déjà ouverte (« settings » : aller aux paramètres).
+pub fn gallery_cmd_path() -> PathBuf {
+    proj().data_local_dir().join("gallery_cmd.txt")
+}
 pub fn config_mtime() -> Option<SystemTime> {
     fs::metadata(config_path()).and_then(|m| m.modified()).ok()
 }

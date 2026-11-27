@@ -449,8 +449,6 @@ fn caret(p: &egui::Painter, x: f32, y: f32, h: f32) {
     p.line_segment([pos2(x, y), pos2(x, y + h)], Stroke::new(1.6_f32, Color32::WHITE));
 }
 
-/// Bouton de menu déroulant : coins arrondis, surligné quand il est actif, avec une petite flèche « v ».
-/// (`Button::selected` d'egui donne des coins carrés, d'où ce bouton maison.)
 /// Bouton d'outil de l'éditeur : transparent, teinté au survol, plein de la couleur d'accent quand l'outil
 /// est choisi. `chevron` : petite flèche (l'outil ouvre une liste).
 fn tool_btn(ui: &mut egui::Ui, selected: bool, icon: &str, label: &str, chevron: bool) -> egui::Response {
@@ -544,25 +542,6 @@ fn shape_row(ui: &mut egui::Ui, w: f32, selected: bool, kind: ShapeKind, label: 
         crate::gallery::ui_kit::icon_check(p, pos2(rect.right() - 18.0, rect.center().y), fg);
     }
     resp
-}
-
-pub fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&mut egui::Ui)) {
-    let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
-    // espaces insécables en fin de libellé : ils réservent la place de la flèche dessinée ensuite
-    let txt = format!("{label}\u{00A0}\u{00A0}\u{00A0}\u{00A0}\u{00A0}");
-    let mut btn = if active {
-        egui::Button::new(egui::RichText::new(txt).color(on_accent(acc))).fill(acc).stroke(Stroke::NONE)
-    } else {
-        egui::Button::new(txt).stroke(Stroke::NONE)
-    };
-    btn = btn.min_size(vec2(0.0, 36.0)).rounding(18.0);
-    let r = egui::menu::menu_custom_button(ui, btn, add);
-    let rect = r.response.rect;
-    let c = pos2(rect.right() - 20.0, rect.center().y + 1.0);
-    let col = if active { on_accent(acc) } else { ui.visuals().text_color() };
-    let st = Stroke::new(1.7_f32, col);
-    ui.painter().line_segment([c + vec2(-4.0, -2.0), c + vec2(0.0, 2.0)], st);
-    ui.painter().line_segment([c + vec2(0.0, 2.0), c + vec2(4.0, -2.0)], st);
 }
 
 impl Editor {
@@ -767,10 +746,10 @@ impl Editor {
                     if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
                         save = Some(false);
                     }
-                    dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
-                        if ui.button(tr("Remplacer l'original")).clicked() {
+                    crate::gallery::ui_kit::dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
+                        if crate::gallery::ui_kit::menu_item(ui, icons::REPLACE, tr("Remplacer l'original"), false, "").clicked() {
                             confirm = true;
-                            ui.close_menu();
+                            crate::gallery::ui_kit::close_dropdown(ui);
                         }
                     });
                 },
@@ -834,7 +813,7 @@ impl Editor {
                     if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
                         commit = true;
                     }
-                    if ui.add(egui::Button::new(egui::RichText::new(tr("Ajouter")).color(on_accent(acc))).fill(acc).stroke(Stroke::NONE).rounding(18.0).min_size(vec2(0.0, 36.0))).clicked() {
+                    if crate::gallery::form::accent_pill(ui, icons::CHECK, tr("Ajouter")).clicked() {
                         commit = true;
                     }
                     if crate::gallery::form::ghost(ui, "", tr("Annuler")).clicked() {
@@ -877,12 +856,15 @@ impl Editor {
                     ui.label(tr("C'est définitif. Pour garder l'original, utilise plutôt « Enregistrer »."));
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
-                        let danger = egui::Button::new(egui::RichText::new(tr("Remplacer")).color(Color32::WHITE))
-                            .fill(Color32::from_rgb(220, 60, 60));
+                        let danger = egui::Button::new(egui::RichText::new(format!("{}  {}", icons::REPLACE, tr("Remplacer"))).color(Color32::WHITE))
+                            .fill(Color32::from_rgb(220, 60, 60))
+                            .stroke(Stroke::NONE)
+                            .rounding(18.0)
+                            .min_size(vec2(0.0, 36.0));
                         if ui.add(danger).clicked() {
                             yes = true;
                         }
-                        if ui.button(tr("Annuler")).clicked() {
+                        if crate::gallery::form::ghost(ui, "", tr("Annuler")).clicked() {
                             no = true;
                         }
                     });
