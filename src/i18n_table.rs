@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 338] = [
+pub static TABLE: [[&str; 5]; 343] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -341,4 +341,9 @@ pub static TABLE: [[&str; 5]; 338] = [
     ["Éditeur : Ctrl+Z annuler  ·  Ctrl+Y rétablir  ·  clic molette ou Espace + glisser : déplacer l'image", "Editor: Ctrl+Z undo  ·  Ctrl+Y redo  ·  middle-click or Space + drag: move the image", "Editor: Ctrl+Z deshacer  ·  Ctrl+Y rehacer  ·  clic central o Espacio + arrastrar: mover la imagen", "Editor: Strg+Z rückgängig  ·  Strg+Y wiederholen  ·  Mittelklick oder Leertaste + Ziehen: Bild verschieben", "编辑器：Ctrl+Z 撤销  ·  Ctrl+Y 重做  ·  中键或空格 + 拖动：移动图片"],
     ["Rechercher une commande…", "Search for a command…", "Buscar un comando…", "Befehl suchen…", "搜索命令…"],
     ["Shirokap", "Shirokap", "Shirokap", "Shirokap", "Shirokap"],
+    ["Appuie sur une touche ou une combinaison…  (Échap = annuler · Retour arrière = vider)", "Press a key or a combination…  (Esc = cancel · Backspace = clear)", "Pulsa una tecla o una combinación…  (Esc = cancelar · Retroceso = vaciar)", "Drücke eine Taste oder Kombination…  (Esc = abbrechen · Rücktaste = leeren)", "按下一个键或组合键…（Esc = 取消 · 退格 = 清空）"],
+    ["Touche seule : elle ne pourra plus être tapée dans les autres applications.", "Single key: it can no longer be typed in other apps.", "Tecla sola: ya no se podrá escribir en otras aplicaciones.", "Einzelne Taste: Sie kann in anderen Apps nicht mehr eingegeben werden.", "单键：在其他应用中将无法再输入该键。"],
+    ["Un raccourci global capte la touche partout dans Windows tant que Shirokap tourne.", "A global shortcut catches the key everywhere in Windows while Shirokap is running.", "Un atajo global captura la tecla en todo Windows mientras Shirokap está en ejecución.", "Ein globales Tastenkürzel fängt die Taste überall in Windows ab, solange Shirokap läuft.", "Shirokap 运行时，全局快捷键会在整个 Windows 中拦截该键。"],
+    ["Des touches ou combinaisons qui fonctionnent partout dans Windows. Écris-les dans le champ, ou clique sur « Enregistrer » puis appuie sur les touches.", "Keys or combinations that work anywhere in Windows. Type them in the field, or click “Record” and press the keys.", "Teclas o combinaciones que funcionan en todo Windows. Escríbelas en el campo o haz clic en «Grabar» y pulsa las teclas.", "Tasten oder Kombinationen, die überall in Windows funktionieren. Gib sie im Feld ein oder klicke auf „Aufzeichnen“ und drücke die Tasten.", "在 Windows 任意位置都可使用的按键或组合键。可在输入框中输入，或点击“录制”后按下按键。"],
+    ["Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Maj ou Win + une touche). Laisse un champ vide pour désactiver le raccourci.", "A single key works (F7, Pause, P…), as does a combination (Ctrl, Alt, Shift or Win + a key). Leave a field empty to turn the shortcut off.", "Funciona una tecla sola (F7, Pausa, P…) o una combinación (Ctrl, Alt, Mayús o Win + una tecla). Deja un campo vacío para desactivar el atajo.", "Eine einzelne Taste funktioniert (F7, Pause, P…), ebenso eine Kombination (Strg, Alt, Umschalt oder Win + eine Taste). Lass ein Feld leer, um das Tastenkürzel zu deaktivieren.", "单个键（F7、Pause、P…）或组合键（Ctrl、Alt、Shift 或 Win + 一个键）均可。留空即可关闭该快捷键。"],
 ];

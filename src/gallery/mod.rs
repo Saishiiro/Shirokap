@@ -571,7 +571,8 @@ impl eframe::App for App {
             self.rename_file(&p, &n);
         }
         // écran d'accueil (au premier lancement, ou via Paramètres > Système)
-        if self.show_welcome && self.editor.is_none() {
+        // (pas par-dessus l'éditeur ; il peut rester ouvert dans la galerie pendant qu'on est ailleurs)
+        if self.show_welcome && !(self.tab == Tab::Gallery && self.editor.is_some()) {
             let (mut start, mut custom, mut change) = (false, false, false);
             let mut keys: Vec<(String, &'static str)> = Vec::new();
             for (k, d) in [

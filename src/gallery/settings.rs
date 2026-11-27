@@ -134,7 +134,7 @@ impl App {
     }
 
     pub(super) fn set_shortcuts(&mut self, ui: &mut egui::Ui) {
-        page_head(ui, tr("Raccourcis"), tr("Des combinaisons de touches qui fonctionnent partout dans Windows. Clique sur « Enregistrer », puis appuie sur ta combinaison."));
+        page_head(ui, tr("Raccourcis"), tr("Des touches ou combinaisons qui fonctionnent partout dans Windows. Écris-les dans le champ, ou clique sur « Enregistrer » puis appuie sur les touches."));
         card(ui, tr("Capture"), |ui| {
             hotkey_row(ui, tr("Capture"), &mut self.cfg.hotkey, &mut self.recording, 0);
             hotkey_row(ui, tr("Zone (sélection)"), &mut self.cfg.hotkey_region, &mut self.recording, 1);
@@ -146,7 +146,7 @@ impl App {
         card(ui, tr("Application"), |ui| {
             hotkey_row(ui, tr("Ouvrir la galerie"), &mut self.cfg.hotkey_gallery, &mut self.recording, 4);
             ui.add_space(4.0);
-            ui.weak(tr("Laisse un champ vide pour désactiver le raccourci. Les touches F1 à F24, Impr. écran, Pause… peuvent s'utiliser seules ; les autres demandent Ctrl, Alt ou Maj."));
+            ui.weak(tr("Une touche seule fonctionne (F7, Pause, P…), tout comme une combinaison (Ctrl, Alt, Maj ou Win + une touche). Laisse un champ vide pour désactiver le raccourci."));
         });
         card(ui, tr("Dans la galerie"), |ui| {
             for l in [

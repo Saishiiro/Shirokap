@@ -71,8 +71,9 @@ pub(super) fn poll_hotkey() -> Poll {
         mods.push("Super");
     }
     for vk in 0x08..=0xDE {
-        if let Some((name, free)) = vk_name(vk) {
-            if vk_down(vk) && (free || !mods.is_empty()) {
+        if let Some((name, _)) = vk_name(vk) {
+            // n'importe quelle touche peut servir seule (l'avertissement s'affiche sous le champ)
+            if vk_down(vk) {
                 let mut parts: Vec<String> = mods.iter().map(|m| m.to_string()).collect();
                 parts.push(name);
                 return Poll::Combo(parts.join("+"));

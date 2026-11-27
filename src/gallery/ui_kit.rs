@@ -651,6 +651,17 @@ pub(crate) fn divider(ui: &mut egui::Ui) {
     ui.add_space(6.0);
 }
 
+/// Raccourci fait d'une seule touche qu'on tape d'habitude (lettre, chiffre, Espace…), et non d'une
+/// touche de fonction : elle sera captée partout dans Windows.
+pub(crate) fn lone_typing_key(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() || s.contains('+') {
+        return false;
+    }
+    let fkey = s.len() > 1 && (s.starts_with('F') || s.starts_with('f')) && s[1..].parse::<u8>().is_ok();
+    !fkey && !["PrintScreen", "Pause", "ScrollLock"].iter().any(|k| k.eq_ignore_ascii_case(s))
+}
+
 pub(crate) fn hotkey_row(ui: &mut egui::Ui, label: &str, val: &mut String, rec: &mut Option<usize>, idx: usize) {
     ui.horizontal(|ui| {
         ui.allocate_ui_with_layout(vec2(175.0, 24.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -658,7 +669,7 @@ pub(crate) fn hotkey_row(ui: &mut egui::Ui, label: &str, val: &mut String, rec: 
             ui.label(label);
         });
         if *rec == Some(idx) {
-            ui.colored_label(Color32::GOLD, tr("Appuie sur ta combinaison…  (Échap = annuler · Retour arrière = vider)"));
+            ui.colored_label(Color32::GOLD, tr("Appuie sur une touche ou une combinaison…  (Échap = annuler · Retour arrière = vider)"));
             if ui.button(tr("Annuler")).clicked() {
                 *rec = None;
             }
@@ -669,6 +680,9 @@ pub(crate) fn hotkey_row(ui: &mut egui::Ui, label: &str, val: &mut String, rec: 
             }
             if !val.is_empty() && val.parse::<global_hotkey::hotkey::HotKey>().is_err() {
                 ui.colored_label(Color32::LIGHT_RED, "invalide");
+            } else if lone_typing_key(val) {
+                ui.colored_label(col(251, 191, 36), ic(crate::icons::ALERT, tr("Touche seule : elle ne pourra plus être tapée dans les autres applications.")))
+                    .on_hover_text(tr("Un raccourci global capte la touche partout dans Windows tant que Shirokap tourne."));
             }
         }
     });
