@@ -9,6 +9,7 @@ struct Pin {
 /// Fenêtre flottante, toujours au premier plan, qui affiche une capture (référence, carte, tuto…).
 /// Glisser = déplacer · molette = taille · clic droit ou Échap = fermer.
 pub fn run(path: String) {
+    crate::common::set_efficiency(true); // capture épinglée : elle ne fait qu'afficher une image
     let Ok(img) = image::open(&path) else { return };
     let img = img.to_rgba8();
     let size = egui::vec2(img.width() as f32, img.height() as f32);
@@ -37,7 +38,6 @@ pub fn run(path: String) {
 
 impl eframe::App for Pin {
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        crate::common::frame_cap(); // au plus 60 images par seconde
         let (pressed, scroll, esc, rclick) = ctx.input(|i| {
             (
                 i.pointer.primary_pressed(),

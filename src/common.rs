@@ -60,25 +60,27 @@ pub struct Config {
     pub language: String,       // "auto" (langue de Windows) | "fr" | "en" | "es" | "de" | "zh"
 }
 
-/// Limite les fenêtres à 60 images par seconde (à appeler au début de chaque `update`).
-/// Sans limite, chaque mouvement de souris redessine la fenêtre à la fréquence de l'écran (144 Hz, 165 Hz…)
-/// et le processeur monte pour rien. On dort le temps restant : les mouvements arrivés entre-temps sont traités d'un coup.
-pub fn frame_cap() {
-    use std::cell::Cell;
-    use std::time::{Duration, Instant};
-    thread_local! {
-        static LAST: Cell<Option<Instant>> = const { Cell::new(None) };
+/// Mode efficacité de Windows 11 (la feuille verte du gestionnaire des tâches) : quand il est actif,
+/// Windows fait tourner le processus sur des cœurs moins rapides et plus économes (« EcoQoS »).
+/// Idéal pour ce qui travaille en arrière-plan ; sans effet (et sans erreur) sur les anciennes versions de Windows.
+pub fn set_efficiency(on: bool) {
+    use windows_sys::Win32::System::Threading::{
+        GetCurrentProcess, ProcessPowerThrottling, SetProcessInformation, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        PROCESS_POWER_THROTTLING_EXECUTION_SPEED, PROCESS_POWER_THROTTLING_STATE,
+    };
+    let state = PROCESS_POWER_THROTTLING_STATE {
+        Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+        ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+        StateMask: if on { PROCESS_POWER_THROTTLING_EXECUTION_SPEED } else { 0 },
+    };
+    unsafe {
+        SetProcessInformation(
+            GetCurrentProcess(),
+            ProcessPowerThrottling,
+            &state as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
+        );
     }
-    let min = Duration::from_micros(16_600);
-    LAST.with(|l| {
-        if let Some(t) = l.get() {
-            let dt = t.elapsed();
-            if dt < min {
-                std::thread::sleep(min - dt);
-            }
-        }
-        l.set(Some(Instant::now()));
-    });
 }
 
 /// Couleur d'accent propre à chaque thème (mode « Auto »).

@@ -85,6 +85,7 @@ struct App {
     hwnd: isize,         // fenêtre Windows de la galerie (pour la barre de titre)
     look_key: Option<(bool, [u8; 3])>, // (thème sombre, fond) déjà appliqués à la barre de titre
     cmd: Option<palette::CmdPalette>, // palette de commandes ouverte (Ctrl+K)
+    eco: Option<bool>,   // mode efficacité de Windows appliqué (galerie en arrière-plan)
     vis_cache: Option<(u64, std::rc::Rc<VisGroups>)>, // captures affichées et leurs groupes par jour, recalculés seulement si besoin
     thumb_rects: HashMap<usize, Rect>, // position des miniatures affichées (pour l'image qui vole)
     fly_from: Option<Rect>, // miniature d'où part la capture qu'on ouvre
@@ -180,6 +181,7 @@ impl App {
             theme_anim: None,
             reveal_req: None,
             cmd: None,
+            eco: None,
             vis_cache: None,
             thumb_rects: HashMap::new(),
             fly_from: None,
@@ -400,7 +402,6 @@ impl eframe::App for App {
 
 
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
-        frame_cap(); // au plus 60 images par seconde
 
         // F11 : plein écran depuis n'importe quel écran ; Échap en sort (hors visionneuse, qui gère son propre Échap)
         if ctx.input(|i| i.key_pressed(Key::F11)) {
@@ -669,6 +670,11 @@ impl eframe::App for App {
             title_bar_look(self.hwnd, target_pal.dark, target_pal.bg);
         }
         let foc = ctx.input(|i| i.focused);
+        // galerie au premier plan : pleine vitesse (fluidité) ; en arrière-plan ou réduite : mode efficacité
+        if self.eco != Some(!foc) {
+            self.eco = Some(!foc);
+            set_efficiency(!foc);
+        }
         if foc && !self.focused {
             self.items = list_items(&self.cfg.save_dir); // nouvelles captures au retour sur la fenêtre
         }

@@ -320,8 +320,11 @@ fn shoot(cfg: &Config, mode: Mode, tx: &mpsc::Sender<bool>, quiet: bool) {
     if is_blocked(&cfg.blocklist, &title) {
         return; // fenêtre sensible : on ne capture pas
     }
+    // pendant une capture, on quitte le mode efficacité : la capture et l'encodage vont à pleine vitesse
+    set_efficiency(false);
     let Some(img) = grab(cfg, mode) else {
         log("capture failed: the screen could not be read");
+        set_efficiency(true);
         return;
     };
     let (cfg, tx) = (cfg.clone(), tx.clone());
@@ -329,6 +332,7 @@ fn shoot(cfg: &Config, mode: Mode, tx: &mpsc::Sender<bool>, quiet: bool) {
         if finish(&cfg, opaque(img), &title).is_some() {
             let _ = tx.send(!quiet);
         }
+        set_efficiency(true);
     });
 }
 
@@ -530,6 +534,8 @@ pub fn run() {
         cfg.save();
     }
     let mut mtime = config_mtime();
+    // le processus du tray ne fait presque rien en attendant un raccourci : mode efficacité de Windows 11
+    set_efficiency(true);
     if autostart_enabled() {
         set_autostart(true); // remet à jour le chemin si l'exe a été déplacé ou recompilé
     }
