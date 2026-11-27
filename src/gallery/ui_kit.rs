@@ -609,24 +609,6 @@ pub(crate) fn hotkeys_ok(c: &Config) -> bool {
         .all(|s| s.is_empty() || s.parse::<global_hotkey::hotkey::HotKey>().is_ok())
 }
 
-pub(crate) fn card(ui: &mut egui::Ui, title: &str, add: impl FnOnce(&mut egui::Ui)) {
-    let fill = ui.visuals().faint_bg_color;
-    let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
-    let shadow_a = if ui.visuals().dark_mode { 70 } else { 22 };
-    egui::Frame::none()
-        .fill(fill)
-        .stroke(stroke)
-        .rounding(12.0_f32)
-        .shadow(egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 18.0, spread: 0.0, color: Color32::from_black_alpha(shadow_a) })
-        .inner_margin(egui::Margin::same(16.0))
-        .show(ui, |ui| {
-            ui.set_width(ui.available_width() - 14.0);
-            ui.label(bold_text(title, 17.0));
-            ui.add_space(2.0);
-            add(ui);
-        });
-    ui.add_space(12.0);
-}
 
 /// Raccourci fait d'une seule touche qu'on tape d'habitude (lettre, chiffre, Espace…), et non d'une
 /// touche de fonction : elle sera captée partout dans Windows.

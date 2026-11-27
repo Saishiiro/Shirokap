@@ -451,6 +451,37 @@ fn caret(p: &egui::Painter, x: f32, y: f32, h: f32) {
 
 /// Bouton de menu déroulant : coins arrondis, surligné quand il est actif, avec une petite flèche « v ».
 /// (`Button::selected` d'egui donne des coins carrés, d'où ce bouton maison.)
+/// Bouton d'outil de l'éditeur : transparent, teinté au survol, plein de la couleur d'accent quand l'outil
+/// est choisi. `chevron` : petite flèche (l'outil ouvre une liste).
+fn tool_btn(ui: &mut egui::Ui, selected: bool, icon: &str, label: &str, chevron: bool) -> egui::Response {
+    let g = ui.painter().layout_no_wrap(format!("{icon}  {label}"), FontId::proportional(14.5), Color32::PLACEHOLDER);
+    let extra = if chevron { 18.0 } else { 0.0 };
+    let (rect, resp) = ui.allocate_exact_size(vec2(g.size().x + 26.0 + extra, 34.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), 0.2);
+    let sk = ui.ctx().animate_bool_with_time(resp.id.with("sel"), selected, 0.2);
+    let v = ui.visuals();
+    let acc = crate::gallery::ui_kit::accent_of(v);
+    let p = ui.painter();
+    if hk * (1.0 - sk) > 0.01 {
+        p.rect_filled(rect, 17.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk * (1.0 - sk)));
+    }
+    if sk > 0.01 {
+        p.rect_filled(rect, 17.0, acc.gamma_multiply(sk));
+    }
+    let col = v.text_color().lerp_to_gamma(on_accent(acc), sk);
+    p.galley(pos2(rect.min.x + 13.0, rect.center().y - g.size().y / 2.0), g, col);
+    if chevron {
+        let c = pos2(rect.right() - 16.0, rect.center().y + 1.0);
+        let st = Stroke::new(1.7_f32, col);
+        p.line_segment([c + vec2(-4.0, -2.0), c + vec2(0.0, 2.0)], st);
+        p.line_segment([c + vec2(0.0, 2.0), c + vec2(4.0, -2.0)], st);
+    }
+    resp
+}
+
 pub fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&mut egui::Ui)) {
     let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
     // espaces insécables en fin de libellé : ils réservent la place de la flèche dessinée ensuite
@@ -458,9 +489,9 @@ pub fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&
     let mut btn = if active {
         egui::Button::new(egui::RichText::new(txt).color(on_accent(acc))).fill(acc).stroke(Stroke::NONE)
     } else {
-        egui::Button::new(txt)
+        egui::Button::new(txt).stroke(Stroke::NONE)
     };
-    btn = btn.min_size(vec2(0.0, 30.0));
+    btn = btn.min_size(vec2(0.0, 36.0)).rounding(18.0);
     let r = egui::menu::menu_custom_button(ui, btn, add);
     let rect = r.response.rect;
     let c = pos2(rect.right() - 20.0, rect.center().y + 1.0);
@@ -594,37 +625,54 @@ impl Editor {
         let mut redo = false;
         // la barre d'outils garde sa place : si la fenêtre est trop étroite, elle est coupée au lieu d'élargir la toile
         crate::gallery::ui_kit::contained(ui, |ui| ui.horizontal_wrapped(|ui| {
+            use crate::gallery::form::{ghost, pill};
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             let ic = |i: &str, t: &str| format!("{i}  {t}");
-            if ui.button(ic(icons::BACK, tr("← Fermer").trim_start_matches("← "))).clicked() {
+            if ghost(ui, icons::BACK, tr("← Fermer").trim_start_matches("← ")).clicked() {
                 exit = Exit::Close;
             }
-            ui.separator();
-            ui.selectable_value(&mut self.tool, Tool::Pen, ic(icons::PEN, tr("Stylo")));
-            let cur_shape = SHAPES.iter().find(|s| s.0 == self.shape).map(|s| tr(s.1)).unwrap_or(tr("Rectangle"));
-            let shapes_label =
-                ic(icons::SHAPES, &if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() });
-            dropdown(ui, &shapes_label, self.tool == Tool::Shape, |ui| {
-                for (k, name) in SHAPES {
-                    if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
-                        self.shape = k;
-                        self.tool = Tool::Shape;
-                        ui.close_menu();
+            // les outils, regroupés dans une pilule en retrait ; l'outil choisi est plein de la couleur d'accent
+            let inset = ui.visuals().extreme_bg_color;
+            egui::Frame::none().fill(inset).rounding(21.0).inner_margin(egui::Margin::same(4.0)).show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
+                    if tool_btn(ui, self.tool == Tool::Pen, icons::PEN, tr("Stylo"), false).clicked() {
+                        self.tool = Tool::Pen;
                     }
-                }
+                    let cur_shape = SHAPES.iter().find(|s| s.0 == self.shape).map(|s| tr(s.1)).unwrap_or(tr("Rectangle"));
+                    let shapes_label = if self.tool == Tool::Shape { trf("Formes : {0}", &[&cur_shape]) } else { tr("Formes").to_string() };
+                    let sr = tool_btn(ui, self.tool == Tool::Shape, icons::SHAPES, &shapes_label, true);
+                    let pop = ui.make_persistent_id("shapes_popup");
+                    if sr.clicked() {
+                        ui.memory_mut(|m| m.toggle_popup(pop));
+                    }
+                    egui::popup::popup_below_widget(ui, pop, &sr, egui::PopupCloseBehavior::CloseOnClick, |ui| {
+                        ui.set_min_width(170.0);
+                        for (k, name) in SHAPES {
+                            if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
+                                self.shape = k;
+                                self.tool = Tool::Shape;
+                            }
+                        }
+                    });
+                    for (t, i, n) in [
+                        (Tool::Highlight, icons::HIGHLIGHT, tr("Surligneur")),
+                        (Tool::Blur, icons::BLUR, tr("Flou")),
+                        (Tool::Text, icons::TEXT, tr("Texte")),
+                        (Tool::Step, icons::STEP, tr("Étape n°")),
+                        (Tool::Eraser, icons::ERASER, tr("Gomme")),
+                    ] {
+                        if tool_btn(ui, self.tool == t, i, n, false).clicked() {
+                            self.tool = t;
+                        }
+                    }
+                });
             });
-            for (t, i, n) in [
-                (Tool::Highlight, icons::HIGHLIGHT, tr("Surligneur")),
-                (Tool::Blur, icons::BLUR, tr("Flou")),
-                (Tool::Text, icons::TEXT, tr("Texte")),
-                (Tool::Step, icons::STEP, tr("Étape n°")),
-                (Tool::Eraser, icons::ERASER, tr("Gomme")),
-            ] {
-                ui.selectable_value(&mut self.tool, t, ic(i, n));
-            }
-            ui.separator();
+            // couleur et taille de l'outil
             if !matches!(self.tool, Tool::Eraser | Tool::Blur) {
                 color_button(ui, "annot", &mut self.col);
             }
+            ui.spacing_mut().slider_width = 120.0;
             match self.tool {
                 Tool::Text | Tool::Step => {
                     ui.add(egui::Slider::new(&mut self.tsize, 12.0..=160.0).text(tr("Taille")));
@@ -637,19 +685,25 @@ impl Editor {
                     ui.add(egui::Slider::new(&mut self.width, 2.0..=30.0).text(tr("épaisseur")));
                 }
             }
-            ui.separator();
-            if ui.add_enabled(!self.ops.is_empty(), egui::Button::new(ic(icons::UNDO, tr("Annuler|modif")))).on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
+            ui.add_space(6.0);
+            let can_undo = !self.ops.is_empty();
+            if ui.add_enabled_ui(can_undo, |ui| pill(ui, icons::UNDO, tr("Annuler|modif"))).inner.on_hover_text(tr("Annuler (Ctrl+Z)")).clicked() {
                 undo = true;
             }
-            if ui.add_enabled(!self.redo.is_empty(), egui::Button::new(ic(icons::REDO, tr("Rétablir")))).on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
+            let can_redo = !self.redo.is_empty();
+            if ui.add_enabled_ui(can_redo, |ui| pill(ui, icons::REDO, tr("Rétablir"))).inner.on_hover_text(tr("Rétablir (Ctrl+Y)")).clicked() {
                 redo = true;
             }
-            if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
+            if pill(ui, icons::COPY, tr("Copier")).on_hover_text(tr("Copier l'image annotée dans le presse-papiers")).clicked() {
                 copy_to_clipboard(&self.render());
                 self.status = format!("{}  {}", icons::COPY, tr("Copiée dans le presse-papiers"));
             }
             let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
-            let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc))).fill(acc);
+            let save_btn = egui::Button::new(egui::RichText::new(ic(icons::SAVE, tr("Enregistrer"))).color(on_accent(acc)).family(egui::FontFamily::Name("bold".into())))
+                .fill(acc)
+                .stroke(Stroke::NONE)
+                .rounding(18.0)
+                .min_size(vec2(0.0, 36.0));
             if ui.add(save_btn).on_hover_text(tr("Enregistre une copie annotée (l'original est conservé)")).clicked() {
                 save = Some(false);
             }

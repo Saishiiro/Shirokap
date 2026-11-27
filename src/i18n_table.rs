@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 359] = [
+pub static TABLE: [[&str; 5]; 366] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -362,4 +362,11 @@ pub static TABLE: [[&str; 5]; 359] = [
     ["Plus elle est haute, plus l'image est fidèle (et lourde).", "The higher it is, the more faithful (and heavier) the image.", "Cuanto más alta, más fiel (y pesada) es la imagen.", "Je höher, desto originalgetreuer (und größer) das Bild.", "数值越高，图像越清晰（文件也越大）。"],
     ["Compression PNG", "PNG compression", "Compresión PNG", "PNG-Komprimierung", "PNG 压缩"],
     ["Maximale : fichiers plus petits, enregistrement un peu plus lent. La qualité reste parfaite.", "Maximum: smaller files, slightly slower saving. Quality stays perfect.", "Máxima: archivos más pequeños, guardado algo más lento. La calidad sigue siendo perfecta.", "Maximal: kleinere Dateien, etwas langsameres Speichern. Die Qualität bleibt perfekt.", "最高：文件更小，保存稍慢。画质保持无损。"],
+    ["Favoris", "Favorites", "Favoritos", "Favoriten", "收藏"],
+    ["Taille des miniatures", "Thumbnail size", "Tamaño de las miniaturas", "Miniaturgröße", "缩略图大小"],
+    ["(racine)", "(root)", "(raíz)", "(Hauptordner)", "（根目录）"],
+    ["Captures", "Screenshots", "Capturas", "Aufnahmen", "截图"],
+    ["Espace utilisé", "Space used", "Espacio usado", "Belegter Speicher", "已用空间"],
+    ["Plus ancienne", "Oldest", "Más antigua", "Älteste", "最早"],
+    ["Plus lourde", "Largest", "Más pesada", "Größte", "最大"],
 ];

@@ -115,16 +115,6 @@ pub fn n_captures(n: usize) -> String {
     }
 }
 
-pub fn n_favs(n: usize) -> String {
-    match lang() {
-        EN => format!("{n} {}", if n == 1 { "favorite" } else { "favorites" }),
-        ES => format!("{n} {}", if n == 1 { "favorito" } else { "favoritos" }),
-        DE => format!("{n} {}", if n == 1 { "Favorit" } else { "Favoriten" }),
-        ZH => format!("{n} 个收藏"),
-        _ => format!("{n} {}", if n > 1 { "favoris" } else { "favori" }),
-    }
-}
-
 /// Ligne « N captures aujourd'hui » du menu du tray.
 pub fn today_label(n: usize) -> String {
     if n == 0 {

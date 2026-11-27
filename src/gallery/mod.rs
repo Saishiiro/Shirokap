@@ -13,7 +13,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-mod form;
+pub(crate) mod form;
 mod grid;
 mod palette;
 mod hotkeys;

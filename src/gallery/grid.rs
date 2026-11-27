@@ -64,59 +64,90 @@ impl App {
         let mut folders: Vec<String> = self.items.iter().map(|i| i.folder.clone()).filter(|f| !f.is_empty()).collect();
         folders.sort();
         folders.dedup();
+        // --- barre d'outils : recherche, tri et taille, puis filtres et actions (elle passe à la ligne si besoin) ---
+        let all_picked = !vis.is_empty() && vis.iter().all(|&i| self.sel.contains(&self.items[i].path));
         contained(ui, |ui| {
-        // curseur plus court : la barre passe à la ligne au lieu de déborder
-        ui.spacing_mut().slider_width = 120.0;
-        ui.horizontal_wrapped(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(ic(icons::SEARCH, tr("Rechercher…"))).desired_width(240.0));
-            let shown = if self.folder.is_empty() { tr("Tous les dossiers").to_string() } else { self.folder.clone() };
-            egui::ComboBox::new("folder", "").selected_text(shown).show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.folder, String::new(), tr("Tous les dossiers"));
-                for f in &folders {
-                    ui.selectable_value(&mut self.folder, f.clone(), f);
+            ui.spacing_mut().slider_width = 110.0;
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            ui.horizontal_wrapped(|ui| {
+                search_field(ui, &mut self.search, tr("Rechercher…"), 260.0);
+                let sort_name = match self.sort {
+                    Sort::Newest => tr("Plus récentes"),
+                    Sort::Oldest => tr("Plus anciennes"),
+                    Sort::Name => tr("Nom"),
+                    Sort::Size => tr("Taille"),
+                };
+                dropdown(ui, &ic(icons::SORT, sort_name), false, |ui| {
+                    for (s, n) in [(Sort::Newest, tr("Plus récentes")), (Sort::Oldest, tr("Plus anciennes")), (Sort::Name, tr("Nom")), (Sort::Size, tr("Taille"))] {
+                        if ui.selectable_label(self.sort == s, n).clicked() {
+                            self.sort = s;
+                            ui.close_menu();
+                        }
+                    }
+                });
+                // taille des miniatures : petit carré … grand carré
+                ui.add_space(4.0);
+                let weak = ui.visuals().weak_text_color();
+                ui.label(egui::RichText::new(icons::IMAGE).size(13.0).color(weak)).on_hover_text(tr("Taille des miniatures"));
+                ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false)).on_hover_text(tr("Taille des miniatures"));
+                ui.label(egui::RichText::new(icons::IMAGE).size(18.0).color(weak));
+                ui.end_row();
+                // dossiers en pastilles (ou une liste s'il y en a beaucoup), favoris
+                if folders.len() <= 6 {
+                    if chip(ui, self.folder.is_empty(), "", tr("Tous les dossiers")).clicked() {
+                        self.folder.clear();
+                    }
+                    for f in &folders {
+                        if chip(ui, self.folder == *f, "", f).clicked() {
+                            self.folder = f.clone();
+                        }
+                    }
+                } else {
+                    let shown = if self.folder.is_empty() { tr("Tous les dossiers").to_string() } else { self.folder.clone() };
+                    dropdown(ui, &ic(icons::FOLDER, &shown), !self.folder.is_empty(), |ui| {
+                        if ui.selectable_label(self.folder.is_empty(), tr("Tous les dossiers")).clicked() {
+                            self.folder.clear();
+                            ui.close_menu();
+                        }
+                        for f in &folders {
+                            if ui.selectable_label(self.folder == *f, f).clicked() {
+                                self.folder = f.clone();
+                                ui.close_menu();
+                            }
+                        }
+                    });
+                }
+                if fav_chip(ui, self.favs_only, tr("Favoris")).clicked() {
+                    self.favs_only = !self.favs_only;
+                }
+                ui.add_space(10.0);
+                // tout sélectionner (ou tout désélectionner si tout est déjà sélectionné)
+                if all_picked {
+                    if pill(ui, icons::DESELECT, tr("Tout désélectionner")).clicked() {
+                        self.sel.clear();
+                    }
+                } else if ui
+                    .add_enabled_ui(!vis.is_empty(), |ui| pill(ui, icons::SELECT_ALL, tr("Tout sélectionner")))
+                    .inner
+                    .on_hover_text(tr("Sélectionner toutes les captures affichées (Ctrl+A)"))
+                    .clicked()
+                {
+                    self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect();
+                }
+                // dossier des captures (ou le sous-dossier filtré) dans l'Explorateur
+                if pill(ui, icons::FOLDER_OPEN, tr("Ouvrir le dossier")).on_hover_text(tr("Ouvrir le dossier des captures dans l'Explorateur")).clicked() {
+                    let root = Path::new(&self.cfg.save_dir);
+                    let dir = if self.folder.is_empty() { root.to_path_buf() } else { root.join(&self.folder) };
+                    let dir = if dir.is_dir() { dir } else { root.to_path_buf() };
+                    let _ = std::fs::create_dir_all(&dir);
+                    let _ = Command::new("explorer").arg(&dir).spawn();
+                }
+                if pill(ui, icons::REFRESH, tr("Actualiser")).clicked() {
+                    self.items = list_items(&self.cfg.save_dir);
                 }
             });
-            let sort_name = match self.sort {
-                Sort::Newest => tr("Plus récentes"),
-                Sort::Oldest => tr("Plus anciennes"),
-                Sort::Name => tr("Nom"),
-                Sort::Size => tr("Taille"),
-            };
-            egui::ComboBox::new("sort", "").selected_text(sort_name).show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.sort, Sort::Newest, tr("Plus récentes"));
-                ui.selectable_value(&mut self.sort, Sort::Oldest, tr("Plus anciennes"));
-                ui.selectable_value(&mut self.sort, Sort::Name, tr("Nom"));
-                ui.selectable_value(&mut self.sort, Sort::Size, tr("Taille"));
-            });
-            ui.toggle_value(&mut self.favs_only, tr("★ Favoris"));
-            ui.weak(tr("Taille"));
-            ui.add(egui::Slider::new(&mut self.thumb_w, 120.0..=420.0).show_value(false));
-            if ui.add(egui::Button::new(icons::REFRESH).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Actualiser")).clicked() {
-                self.items = list_items(&self.cfg.save_dir);
-            }
-            // tout sélectionner (ou tout désélectionner si tout est déjà sélectionné)
-            let all_picked = !vis.is_empty() && vis.iter().all(|&i| self.sel.contains(&self.items[i].path));
-            if all_picked {
-                if ui.button(ic(icons::DESELECT, tr("Tout désélectionner"))).clicked() {
-                    self.sel.clear();
-                }
-            } else if ui
-                .add_enabled(!vis.is_empty(), egui::Button::new(ic(icons::SELECT_ALL, tr("Tout sélectionner"))))
-                .on_hover_text(tr("Sélectionner toutes les captures affichées (Ctrl+A)"))
-                .clicked()
-            {
-                self.sel = vis.iter().map(|&i| self.items[i].path.clone()).collect();
-            }
-            // dossier des captures (ou le sous-dossier filtré) dans l'Explorateur
-            if ui.button(ic(icons::FOLDER_OPEN, tr("Ouvrir le dossier"))).on_hover_text(tr("Ouvrir le dossier des captures dans l'Explorateur")).clicked() {
-                let root = Path::new(&self.cfg.save_dir);
-                let dir = if self.folder.is_empty() { root.to_path_buf() } else { root.join(&self.folder) };
-                let dir = if dir.is_dir() { dir } else { root.to_path_buf() };
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = Command::new("explorer").arg(&dir).spawn();
-            }
         });
-        });
+        ui.add_space(4.0);
 
         // nouveau filtre, nouvelle recherche ou nouveau tri : les miniatures réapparaissent en cascade
         let sig = {
@@ -133,48 +164,66 @@ impl App {
         }
 
         let mut acts: Vec<Act> = Vec::new();
-        // barre de sélection : elle glisse depuis le haut quand on sélectionne, et se replie ensuite
+        // pilule de sélection : elle monte du bas de la page quand on sélectionne, et redescend ensuite
         if !self.sel.is_empty() {
             self.sel_shown = self.sel.len();
         }
-        let sel_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("selbar"), !self.sel.is_empty(), anim::PAGE, egui::emath::easing::cubic_out);
-        if sel_k > 0.01 {
-            let h = 46.0;
-            let (slot, _) = ui.allocate_exact_size(vec2(ui.available_width(), h * sel_k), Sense::hover());
-            let inner = Rect::from_min_size(slot.min - vec2(0.0, h * (1.0 - sel_k)), vec2(slot.width(), h));
-            let mut bar = ui.new_child(egui::UiBuilder::new().max_rect(inner));
-            // on ne coupe que pendant l'animation (une fois dépliée, la barre s'affiche en entier)
-            if sel_k < 0.999 {
-                bar.set_clip_rect(slot.expand2(vec2(4.0, 0.0)).intersect(ui.clip_rect()));
-            }
-            bar.multiply_opacity(sel_k);
-            bar.add_space(6.0); // les boutons dépassent un peu la hauteur de ligne : on les décale vers le bas
+        let sel_k = ctx.animate_bool_with_time_and_easing(egui::Id::new("selbar"), !self.sel.is_empty(), anim::ENTER, egui::emath::easing::cubic_out);
+        if sel_k > 0.01 && self.sheet_rect != Rect::NOTHING {
             let n_sel = self.sel_shown;
-            bar.horizontal(|ui| {
-                ui.label(trf("{0} sélectionnée(s)", &[&n_sel]));
-                if self.sel.len() == 2 && ui.button(ic(icons::COMPARE, tr("Comparer"))).clicked() {
-                    acts.push(Act::Compare);
-                }
-                if ui.button(ic(icons::COPY, tr("Copier les fichiers"))).clicked() {
-                    acts.push(Act::CopyFiles);
-                }
-                if ui.button(ic(icons::EXPORT, tr("Exporter…"))).clicked() {
-                    acts.push(Act::Export);
-                }
-                if ui.button(tr("★ Favori")).clicked() {
-                    for p in self.sel.clone() {
-                        acts.push(Act::Fav(p));
-                    }
-                }
-                if ui.button(ic(icons::TRASH, tr("Corbeille"))).clicked() {
-                    acts.push(Act::Trash(self.sel.iter().cloned().collect()));
-                }
-                if ui.button(ic(icons::CLOSE, tr("Désélectionner"))).clicked() {
-                    self.sel.clear();
-                }
-            });
+            let acc = self.shown_acc;
+            let fg = on_accent(acc);
+            let sheet = self.sheet_rect;
+            let two = self.sel.len() == 2;
+            egui::Area::new(egui::Id::new("selbar_area"))
+                .order(egui::Order::Foreground)
+                .fixed_pos(pos2(sheet.center().x, sheet.max.y - 18.0 + 30.0 * (1.0 - sel_k)))
+                .pivot(Align2::CENTER_BOTTOM)
+                .show(&ctx, |ui| {
+                    ui.multiply_opacity(sel_k);
+                    egui::Frame::none()
+                        .fill(acc)
+                        .rounding(26.0)
+                        .shadow(egui::epaint::Shadow { offset: vec2(0.0, 12.0), blur: 32.0, spread: 0.0, color: Color32::from_black_alpha(140) })
+                        .inner_margin(egui::Margin { left: 18.0, right: 6.0, top: 6.0, bottom: 6.0 })
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                ui.label(egui::RichText::new(trf("{0} sélectionnée(s)", &[&n_sel])).color(fg).family(egui::FontFamily::Name("bold".into())));
+                                ui.add_space(6.0);
+                                let btn = |ui: &mut egui::Ui, icon: &str, label: &str| {
+                                    ui.add(
+                                        egui::Button::new(egui::RichText::new(ic(icon, label)).color(fg))
+                                            .fill(fg.gamma_multiply(0.16))
+                                            .stroke(Stroke::NONE)
+                                            .rounding(18.0)
+                                            .min_size(vec2(0.0, 36.0)),
+                                    )
+                                };
+                                if two && btn(ui, icons::COMPARE, tr("Comparer")).clicked() {
+                                    acts.push(Act::Compare);
+                                }
+                                if btn(ui, icons::COPY, tr("Copier les fichiers")).clicked() {
+                                    acts.push(Act::CopyFiles);
+                                }
+                                if btn(ui, icons::EXPORT, tr("Exporter…")).clicked() {
+                                    acts.push(Act::Export);
+                                }
+                                if btn(ui, icons::STAR, tr("Favori")).clicked() {
+                                    for p in self.sel.clone() {
+                                        acts.push(Act::Fav(p));
+                                    }
+                                }
+                                if btn(ui, icons::TRASH, tr("Corbeille")).clicked() {
+                                    acts.push(Act::Trash(self.sel.iter().cloned().collect()));
+                                }
+                                if btn(ui, icons::CLOSE, tr("Désélectionner")).clicked() {
+                                    self.sel.clear();
+                                }
+                            });
+                        });
+                });
         }
-        ui.separator();
 
         if vis.is_empty() {
             self.empty_state(ui);
@@ -187,7 +236,7 @@ impl App {
         let selecting = !self.sel.is_empty();
         // la grille remplit toute la largeur : le nombre de colonnes dépend de la taille souhaitée
         let gap = 12.0_f32;
-        let avail = (ui.available_width() - 14.0).max(120.0);
+        let avail = (ui.available_width() - 28.0).max(120.0);
         let cols = ((avail + gap) / (self.thumb_w + gap)).floor().max(1.0);
         let cw = ((avail - gap * (cols - 1.0)) / cols).floor();
         let ch = (cw * 9.0 / 16.0).floor();
@@ -197,14 +246,24 @@ impl App {
         self.thumb_rects.clear();
         let closing_idx = self.fly.as_ref().filter(|f| f.closing && !f.fade).map(|f| f.idx);
         let now = ctx.input(|i| i.time) as f32;
+        // la grille est posée dans un panneau un peu en retrait de la page
+        let inset = ui.visuals().extreme_bg_color;
+        egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin { left: 14.0, right: 4.0, top: 12.0, bottom: 0.0 }).show(ui, |ui| {
         egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+            ui.set_max_width(ui.available_width() - 10.0); // place pour la barre de défilement
             for (label, idxs) in groups {
                 if !label.is_empty() {
-                    ui.add_space(8.0);
-                    ui.horizontal(|ui| {
-                        ui.label(bold_text(label, 16.0));
-                        ui.weak(n_captures(idxs.len()));
+                    ui.add_space(4.0);
+                    // titre du jour en pastille : « Aujourd'hui · 5 »
+                    let v = ui.visuals().clone();
+                    egui::Frame::none().fill(v.faint_bg_color).rounding(14.0).inner_margin(egui::Margin::symmetric(12.0, 5.0)).show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing.x = 6.0;
+                            ui.label(bold_text(label, 14.0));
+                            ui.label(egui::RichText::new(format!("· {}", idxs.len())).size(13.5).color(v.weak_text_color()));
+                        });
                     });
+                    ui.add_space(2.0);
                 }
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = vec2(gap, gap);
@@ -257,7 +316,7 @@ impl App {
                         let rect = rect.translate(vec2(0.0, -4.0 * lift)).expand(2.0 * lift);
 
                         // --- miniature arrondie + bandeau d'info ---
-                        let rnd = 10.0_f32;
+                        let rnd = 14.0_f32;
                         let p = ui.painter();
                         if lift > 0.01 {
                             let sh = egui::epaint::Shadow {
@@ -288,9 +347,9 @@ impl App {
                                 ctx.request_repaint();
                             }
                         }
-                        let bar = Rect::from_min_max(pos2(rect.min.x, rect.max.y - 24.0), rect.max);
-                        let bar_r = Rounding { nw: 0.0, ne: 0.0, sw: rnd, se: rnd };
-                        p.rect_filled(bar, bar_r, Color32::from_black_alpha(150));
+                        // nom et heure dans un bandeau arrondi qui flotte en bas de la miniature
+                        let bar = Rect::from_min_max(pos2(rect.min.x + 7.0, rect.max.y - 7.0 - 26.0), rect.max - vec2(7.0, 7.0));
+                        p.rect_filled(bar, 9.0, Color32::from_black_alpha(165));
                         let time_rect = p.text(bar.right_center() - vec2(10.0, 0.0), Align2::RIGHT_CENTER, &when, FontId::proportional(12.5), Color32::from_rgba_unmultiplied(255, 255, 255, 190));
                         let mut job = egui::text::LayoutJob::simple_singleline(name, FontId::proportional(12.5), Color32::WHITE);
                         job.wrap.max_width = (time_rect.min.x - 10.0 - (bar.min.x + 10.0)).max(10.0);
@@ -419,7 +478,8 @@ impl App {
                     }
                 });
             }
-            ui.add_space(12.0);
+            ui.add_space(80.0); // la pilule de sélection ne cache jamais la dernière rangée
+        });
         });
         if loads > 0 {
             ctx.request_repaint();

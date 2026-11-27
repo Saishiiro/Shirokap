@@ -36,62 +36,166 @@ impl App {
             }
             return;
         }
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            card(ui, &ic(icons::LAYERS, tr("Vue d'ensemble")), |ui| {
-                ui.label(format!("{} · {}", n_captures(self.items.len()), human(total)));
-                ui.label(n_favs(self.favs.len()));
-                if let Some(o) = self.items.last() {
-                    ui.label(trf("Plus ancienne : {0}", &[&day_of(o.modified).format(dfmt(true))]));
+        let acc = self.shown_acc;
+        let since = self.tab_at.elapsed().as_secs_f32();
+        egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
+            ui.set_max_width(ui.available_width() - 12.0);
+            let v = ui.visuals().clone();
+            let inset = v.extreme_bg_color;
+            let gap = 10.0;
+            // --- vue d'ensemble : quatre tuiles (la dernière, double : plus ancienne et plus lourde) ---
+            let w = ui.available_width();
+            let small = ((w - 3.0 * gap) / (3.0 + 2.6)).floor();
+            let big = w - 3.0 * small - 3.0 * gap;
+            let oldest = self.items.iter().min_by_key(|i| i.modified);
+            let heaviest = self.items.iter().max_by_key(|i| i.size);
+            let tile_h = 118.0;
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = gap;
+                let total_s = human(total);
+                let (num, unit) = total_s.rsplit_once(' ').unwrap_or((total_s.as_str(), ""));
+                stat_tile(ui, small, tile_h, icons::GALLERY, acc, true, tr("Captures"), &self.items.len().to_string(), "", "", since, 0);
+                stat_tile(ui, small, tile_h, icons::HARD_DRIVE, col(56, 189, 248), false, tr("Espace utilisé"), num, unit, "", since, 1);
+                stat_tile(ui, small, tile_h, icons::STAR, col(251, 191, 36), false, tr("Favoris"), &self.favs.len().to_string(), "", "", since, 2);
+                // tuile double
+                let (r, _) = ui.allocate_exact_size(vec2(big, tile_h), Sense::hover());
+                let k = ease_out(((since - 0.15) / 0.5).clamp(0.0, 1.0));
+                let mut p = ui.painter().clone();
+                p.multiply_opacity(k);
+                let r = r.translate(vec2(0.0, 10.0 * (1.0 - k)));
+                p.rect_filled(r, 14.0, inset);
+                let half = (r.width() - 1.0) / 2.0;
+                let left = Rect::from_min_size(r.min, vec2(half, r.height()));
+                let right = Rect::from_min_size(pos2(left.max.x + 1.0, r.min.y), vec2(half, r.height()));
+                p.line_segment([pos2(left.max.x, r.min.y + 16.0), pos2(left.max.x, r.max.y - 16.0)], Stroke::new(1.0_f32, v.widgets.noninteractive.bg_stroke.color));
+                if let Some(o) = oldest {
+                    let d = day_of(o.modified);
+                    // l'année n'est affichée que si ce n'est pas l'année en cours
+                    let date = d.format(dfmt(chrono::Datelike::year(&d) != chrono::Datelike::year(&today))).to_string();
+                    tile_content(&p, left, icons::CALENDAR, col(52, 211, 153), false, tr("Plus ancienne"), &date, "", &file_name(&o.path), &v);
                 }
-                if let Some(b) = self.items.iter().max_by_key(|i| i.size) {
-                    ui.label(trf("Plus lourde : {0} ({1})", &[&file_name(&b.path), &human(b.size)]));
+                if let Some(b) = heaviest {
+                    let hs = human(b.size);
+                    let (num, unit) = hs.rsplit_once(' ').unwrap_or((hs.as_str(), ""));
+                    tile_content(&p, right, icons::LAYERS, col(251, 113, 133), false, tr("Plus lourde"), num, unit, &file_name(&b.path), &v);
+                }
+                if k < 1.0 {
+                    ui.ctx().request_repaint();
                 }
             });
-            card(ui, &ic(icons::CALENDAR, tr("7 derniers jours")), |ui| {
-                let counts: Vec<(String, usize)> = (0..7)
-                    .map(|d| {
-                        let day = today - chrono::Duration::days(d);
-                        let label = if d == 0 { tr("Aujourd'hui").to_string() } else { day.format(dfmt(false)).to_string() };
-                        (label, self.items.iter().filter(|i| day_of(i.modified) == day).count())
-                    })
-                    .collect();
-                let max = counts.iter().map(|c| c.1).max().unwrap_or(1).max(1);
-                let since = self.tab_at.elapsed().as_secs_f32();
-                for (row_i, (label, n)) in counts.into_iter().enumerate() {
-                    let grow = ease_out(((since - 0.12 - row_i as f32 * 0.07) / 0.7).clamp(0.0, 1.0));
-                    if grow < 1.0 {
-                        ui.ctx().request_repaint();
-                    }
-                    let (row, _) = ui.allocate_exact_size(vec2(480.0, 22.0), Sense::hover());
-                    let txt = ui.visuals().text_color();
-                    let acc = accent_of(ui.visuals());
-                    let track = ui.visuals().widgets.inactive.bg_fill;
+            ui.add_space(gap);
+
+            // --- 7 derniers jours (barres verticales) et répartition par dossier, côte à côte ---
+            let counts: Vec<(String, usize)> = (0..7)
+                .rev()
+                .map(|d| {
+                    let day = today - chrono::Duration::days(d);
+                    let label = if d == 0 { tr("Aujourd'hui").to_string() } else { day.format(dfmt(false)).to_string() };
+                    (label, self.items.iter().filter(|i| day_of(i.modified) == day).count())
+                })
+                .collect();
+            let mut by: HashMap<String, (usize, u64)> = HashMap::new();
+            for i in &self.items {
+                let name = if i.folder.is_empty() { tr("(racine)").to_string() } else { i.folder.clone() };
+                let e = by.entry(name).or_default();
+                e.0 += 1;
+                e.1 += i.size;
+            }
+            let mut folders: Vec<(String, (usize, u64))> = by.into_iter().collect();
+            folders.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+            folders.truncate(8);
+            let w = ui.available_width();
+            let side = w > 760.0;
+            let (cw, fw) = if side { let c = ((w - gap) * 0.6).floor(); (c, w - gap - c) } else { (w, w) };
+            let panel_h = 300.0_f32.max(76.0 + folders.len() as f32 * 44.0);
+            let chart = |ui: &mut egui::Ui| {
+                egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
+                    ui.set_width(cw - 40.0);
+                    ui.set_height(panel_h - 40.0);
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(icons::CALENDAR).color(v.weak_text_color()));
+                        ui.label(bold_text(tr("7 derniers jours"), 15.0));
+                    });
+                    ui.add_space(8.0);
+                    let (area, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
+                    let max = counts.iter().map(|c| c.1).max().unwrap_or(1).max(1);
+                    let n = counts.len() as f32;
+                    let colw = area.width() / n;
+                    let bw = (colw * 0.55).min(46.0);
+                    let label_h = 22.0;
+                    let num_h = 22.0;
+                    let bar_max = area.height() - label_h - num_h;
                     let p = ui.painter();
-                    p.text(row.left_center(), Align2::LEFT_CENTER, label, FontId::proportional(15.0), txt);
-                    let bar = Rect::from_min_size(pos2(row.min.x + 120.0, row.center().y - 7.0), vec2(320.0, 14.0));
-                    p.rect_filled(bar, 7.0, track);
-                    if n > 0 && grow > 0.0 {
-                        let w = (bar.width() * n as f32 / max as f32).max(14.0) * grow;
-                        p.rect_filled(Rect::from_min_size(bar.min, vec2(w.max(1.0), bar.height())), 7.0, acc);
+                    for (i, (label, c)) in counts.iter().enumerate() {
+                        // les barres poussent l'une après l'autre en arrivant sur la page
+                        let grow = ease_out(((since - 0.12 - i as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
+                        if grow < 1.0 {
+                            ui.ctx().request_repaint();
+                        }
+                        let today_col = i + 1 == counts.len();
+                        let cx = area.min.x + colw * (i as f32 + 0.5);
+                        let h = if *c == 0 { 6.0 } else { (bar_max * *c as f32 / max as f32).max(10.0) } * grow;
+                        let bottom = area.max.y - label_h;
+                        let bar = Rect::from_min_max(pos2(cx - bw / 2.0, bottom - h), pos2(cx + bw / 2.0, bottom));
+                        let fill = if today_col {
+                            acc
+                        } else if *c > 0 {
+                            v.widgets.hovered.weak_bg_fill
+                        } else {
+                            v.faint_bg_color
+                        };
+                        p.rect_filled(bar, Rounding { nw: 9.0, ne: 9.0, sw: 4.0, se: 4.0 }, fill);
+                        let shown = (*c as f32 * grow).round() as usize;
+                        let num_col = if today_col { acc.lerp_to_gamma(v.text_color(), 0.25) } else if *c > 0 { v.text_color() } else { v.weak_text_color() };
+                        p.text(pos2(cx, bar.min.y - 6.0), Align2::CENTER_BOTTOM, shown.to_string(), FontId::new(13.5, egui::FontFamily::Name("bold".into())), num_col);
+                        let lf = if today_col { FontId::new(12.5, egui::FontFamily::Name("bold".into())) } else { FontId::proportional(12.5) };
+                        p.text(pos2(cx, area.max.y - 2.0), Align2::CENTER_BOTTOM, label, lf, if today_col { v.text_color() } else { v.weak_text_color() });
                     }
-                    let shown_n = (n as f32 * grow).round() as usize;
-                    p.text(pos2(bar.max.x + 12.0, row.center().y), Align2::LEFT_CENTER, shown_n.to_string(), FontId::proportional(15.0), txt);
-                }
-            });
-            card(ui, &ic(icons::FOLDER, tr("Dossiers / jeux")), |ui| {
-                let mut by: HashMap<String, (usize, u64)> = HashMap::new();
-                for i in &self.items {
-                    let name = if i.folder.is_empty() { "(racine)".to_string() } else { i.folder.clone() };
-                    let e = by.entry(name).or_default();
-                    e.0 += 1;
-                    e.1 += i.size;
-                }
-                let mut v: Vec<(String, (usize, u64))> = by.into_iter().collect();
-                v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-                for (name, (n, sz)) in v.into_iter().take(10) {
-                    ui.label(format!("{name} : {} · {}", n_captures(n), human(sz)));
-                }
-            });
+                });
+            };
+            let palette_cols = [acc, col(244, 114, 182), col(56, 189, 248), col(251, 191, 36), col(52, 211, 153), col(251, 146, 60), col(167, 139, 250), col(148, 163, 184)];
+            let folders_ui = |ui: &mut egui::Ui| {
+                egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
+                    ui.set_width(fw - 40.0);
+                    ui.set_min_height(panel_h - 40.0);
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new(icons::FOLDER).color(v.weak_text_color()));
+                        ui.label(bold_text(tr("Dossiers / jeux"), 15.0));
+                    });
+                    ui.add_space(6.0);
+                    let top = folders.first().map(|f| f.1 .0).unwrap_or(1).max(1);
+                    for (n, (name, (c, sz))) in folders.iter().enumerate() {
+                        let grow = ease_out(((since - 0.2 - n as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
+                        // nombre et poids calés à droite ; le nom prend le reste (coupé avec « … » s'il est long)
+                        ui.horizontal(|ui| {
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                ui.label(egui::RichText::new(format!("{} · {}", n_captures(*c), human(*sz))).size(12.5).color(v.weak_text_color()));
+                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                                    ui.add(egui::Label::new(bold_text(name, 14.0)).truncate());
+                                });
+                            });
+                        });
+                        let (track, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
+                        let p = ui.painter();
+                        p.rect_filled(track, 4.0, v.faint_bg_color);
+                        let fill_w = (track.width() * *c as f32 / top as f32).max(8.0) * grow;
+                        p.rect_filled(Rect::from_min_size(track.min, vec2(fill_w, track.height())), 4.0, palette_cols[n % palette_cols.len()]);
+                        ui.add_space(6.0);
+                    }
+                });
+            };
+            if side {
+                ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = gap;
+                    chart(ui);
+                    folders_ui(ui);
+                });
+            } else {
+                chart(ui);
+                ui.add_space(gap);
+                folders_ui(ui);
+            }
+            ui.add_space(12.0);
         });
     }
 
@@ -389,5 +493,58 @@ impl App {
             }
             self.zoom.controls(ui, area, tr("Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle"));
         }
+    }
+}
+
+/// Tuile de statistique : icône et nom en haut, chiffre en grand en bas à droite. Elle monte en fondu.
+#[allow(clippy::too_many_arguments)]
+fn stat_tile(ui: &mut egui::Ui, w: f32, h: f32, icon: &str, tint: Color32, solid: bool, label: &str, value: &str, unit: &str, sub: &str, since: f32, n: usize) {
+    let (r, _) = ui.allocate_exact_size(vec2(w, h), Sense::hover());
+    let k = ease_out(((since - 0.05 * n as f32) / 0.5).clamp(0.0, 1.0));
+    if k < 1.0 {
+        ui.ctx().request_repaint();
+    }
+    let v = ui.visuals().clone();
+    let mut p = ui.painter().clone();
+    p.multiply_opacity(k);
+    let r = r.translate(vec2(0.0, 10.0 * (1.0 - k)));
+    p.rect_filled(r, 14.0, v.extreme_bg_color);
+    tile_content(&p, r, icon, tint, solid, label, value, unit, sub, &v);
+}
+
+/// Contenu d'une tuile (ou d'une moitié de tuile double).
+#[allow(clippy::too_many_arguments)]
+fn tile_content(p: &egui::Painter, r: Rect, icon: &str, tint: Color32, solid: bool, label: &str, value: &str, unit: &str, sub: &str, v: &egui::Visuals) {
+    let inner = r.shrink2(vec2(18.0, 16.0));
+    let tile = Rect::from_min_size(inner.min, vec2(30.0, 30.0));
+    let dark = v.dark_mode;
+    if solid {
+        p.rect_filled(tile, 9.0, tint);
+        p.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), on_accent(tint));
+    } else {
+        p.rect_filled(tile, 9.0, Color32::from_rgba_unmultiplied(tint.r(), tint.g(), tint.b(), if dark { 42 } else { 52 }));
+        let fg = if dark { tint.lerp_to_gamma(Color32::WHITE, 0.3) } else { tint.lerp_to_gamma(Color32::BLACK, 0.3) };
+        p.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), fg);
+    }
+    let fit = |text: &str, font: FontId, color: Color32, max_w: f32| {
+        let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+        job.wrap = egui::text::TextWrapping { max_width: max_w.max(10.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
+        p.layout_job(job)
+    };
+    let lab = fit(label, FontId::new(13.5, egui::FontFamily::Name("bold".into())), v.text_color(), inner.max.x - tile.max.x - 10.0);
+    p.galley(pos2(tile.max.x + 10.0, tile.center().y - lab.size().y / 2.0), lab, v.text_color());
+    // chiffre en bas à droite, unité plus petite et plus discrète
+    let big = FontId::new(30.0, egui::FontFamily::Name("bold".into()));
+    let mut x = inner.max.x;
+    if !unit.is_empty() {
+        let u = p.text(pos2(x, inner.max.y), Align2::RIGHT_BOTTOM, unit, FontId::new(16.0, egui::FontFamily::Name("bold".into())), v.weak_text_color());
+        x = u.min.x - 5.0;
+    }
+    let vr = p.text(pos2(x, inner.max.y + 3.0), Align2::RIGHT_BOTTOM, value, big, v.text_color());
+    if !sub.is_empty() {
+        // nom du fichier, entre le titre et le chiffre
+        let g = fit(sub, FontId::proportional(12.0), v.weak_text_color(), inner.width());
+        let y = (tile.max.y + vr.min.y) / 2.0 - g.size().y / 2.0;
+        p.galley(pos2(inner.min.x, y), g, v.weak_text_color());
     }
 }

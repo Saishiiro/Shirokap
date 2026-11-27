@@ -405,3 +405,63 @@ pub(crate) fn hotkey_row(ui: &mut egui::Ui, rows: &mut Rows, label: &str, val: &
     });
     rows.bgs.push((bg, res.response.rect));
 }
+
+/// Champ de recherche en pilule : loupe à gauche, croix pour effacer à droite.
+pub(crate) fn search_field(ui: &mut egui::Ui, text: &mut String, hint: &str, width: f32) -> egui::Response {
+    let v = ui.visuals().clone();
+    let weak = v.weak_text_color();
+    egui::Frame::none()
+        .fill(v.extreme_bg_color)
+        .stroke(v.widgets.inactive.bg_stroke)
+        .rounding(19.0)
+        .inner_margin(egui::Margin { left: 14.0, right: 6.0, top: 0.0, bottom: 0.0 })
+        .show(ui, |ui| {
+            ui.set_width(width);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.label(egui::RichText::new(icons::SEARCH).size(15.0).color(weak));
+                let w = ui.available_width() - if text.is_empty() { 0.0 } else { 30.0 };
+                let r = ui.add(egui::TextEdit::singleline(text).frame(false).desired_width(w).margin(vec2(2.0, 10.0)).hint_text(hint));
+                if !text.is_empty() {
+                    let (cr, c) = ui.allocate_exact_size(vec2(26.0, 26.0), Sense::click());
+                    let c = c.on_hover_text(tr("Effacer la recherche"));
+                    if c.hovered() {
+                        ui.painter().circle_filled(cr.center(), 13.0, v.widgets.hovered.weak_bg_fill);
+                    }
+                    ui.painter().text(cr.center(), Align2::CENTER_CENTER, icons::CLOSE, FontId::proportional(13.0), weak);
+                    if c.clicked() {
+                        text.clear();
+                    }
+                }
+                r
+            })
+            .inner
+        })
+        .inner
+}
+
+/// Pastille de filtre : pleine de la couleur d'accent quand elle est active.
+pub(crate) fn chip(ui: &mut egui::Ui, on: bool, icon: &str, label: &str) -> egui::Response {
+    let acc = accent_of(ui.visuals());
+    let text = if icon.is_empty() { label.to_string() } else { ic(icon, label) };
+    let rich = if on {
+        egui::RichText::new(text).color(on_accent(acc)).family(egui::FontFamily::Name("bold".into()))
+    } else {
+        egui::RichText::new(text)
+    };
+    let fill = if on { acc } else { ui.visuals().faint_bg_color };
+    ui.add(egui::Button::new(rich).fill(fill).stroke(Stroke::NONE).rounding(17.0).min_size(vec2(0.0, 34.0)))
+}
+
+/// Pastille « Favoris » : jaune quand le filtre est actif.
+pub(crate) fn fav_chip(ui: &mut egui::Ui, on: bool, label: &str) -> egui::Response {
+    let gold = col(251, 191, 36);
+    let text = ic(if on { "★" } else { icons::STAR }, label);
+    let rich = if on {
+        egui::RichText::new(text).color(Color32::from_rgb(28, 22, 8)).family(egui::FontFamily::Name("bold".into()))
+    } else {
+        egui::RichText::new(text)
+    };
+    let fill = if on { gold } else { ui.visuals().faint_bg_color };
+    ui.add(egui::Button::new(rich).fill(fill).stroke(Stroke::NONE).rounding(17.0).min_size(vec2(0.0, 34.0)))
+}
