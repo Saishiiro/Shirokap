@@ -122,6 +122,8 @@ impl App {
                 tr("Clic : ouvrir  ·  Ctrl+clic : sélectionner  ·  clic droit : menu  ·  glisser des images dessus : les importer"),
                 tr("Ctrl+A : tout sélectionner  ·  Suppr : corbeille  ·  Échap : désélectionner  ·  Ctrl+B : menu latéral  ·  Ctrl+K : palette de commandes"),
                 tr("Visionneuse : ← → naviguer  ·  F favori  ·  Espace diaporama  ·  F11 plein écran  ·  molette zoom"),
+                tr("Zoom : molette  ·  + et − par paliers  ·  0 ajuster  ·  1 taille réelle  ·  double-clic (visionneuse) : ajuster / taille réelle"),
+                tr("Éditeur : Ctrl+Z annuler  ·  Ctrl+Y rétablir  ·  clic molette ou Espace + glisser : déplacer l'image"),
                 tr("Capture épinglée : glisser pour déplacer  ·  molette pour la taille  ·  clic droit ou Échap pour fermer"),
                 tr("Icône du tray : clic gauche = galerie  ·  clic molette = capture  ·  clic droit = menu"),
             ] {

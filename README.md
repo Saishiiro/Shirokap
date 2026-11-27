@@ -5,7 +5,7 @@
 # Shirokap
 
 **A lightweight screenshot tool for Windows, living in the system tray.**
-Global hotkeys · gallery · annotation editor · 12 themes · EN / FR / ES / DE / 中文
+Global hotkeys · animated gallery · annotation editor · 17 themes · command palette · EN / FR / ES / DE / 中文
 
 [![Release](https://img.shields.io/github/v/release/Saishiiro/Shirokap?style=flat-square)](../../releases/latest)
 [![GPL-3.0 License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](LICENSE)
@@ -43,12 +43,15 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 
 **Gallery**
 - Grid of rounded thumbnails grouped by day, with search, sorting, favorites, multi-selection (with select all), quick access to the folder and drag and drop to import images.
-- Viewer (zoom, slideshow, fullscreen), slider comparison, statistics.
-- Collapsible side menu (Ctrl+B), 12 themes and a customizable accent color.
+- Viewer with smooth zoom (wheel towards the cursor, drag, double-click, + − 0 1), slideshow, fullscreen; slider comparison, statistics.
+- Command palette (Ctrl+K): type a few letters to switch tab, theme, folder or sort, or to open a screenshot.
+- Smooth animations throughout: thumbnails that lift on hover, screenshots that fly from their thumbnail to the viewer, cascading thumbnails, sliding menus and notifications.
+- 17 themes with a circular reveal when switching, an accent color per theme ("Auto") or of your choice, Lucide icons, title bar matching the theme.
+- Collapsible side menu (Ctrl+B) that shows icons when collapsed.
 
 **Annotation editor**
 - Pen, shapes (rectangle, ellipse, line, arrows…), highlighter, blur, text, numbered steps, eraser.
-- Preview faithful to the final result, unlimited undo and redo, save as a copy or replace the original.
+- Preview faithful to the final result, unlimited undo and redo, zoom (wheel, + − 0 1) and move (middle-click or Space + drag), save as a copy or replace the original.
 
 **Languages**
 - English and French, plus Spanish, German and Chinese (unreviewed translations).
@@ -58,6 +61,7 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 **Other**
 - Screenshot pinned on top of the screen, copy files to the clipboard, export the selection.
 - Launch with Windows, export/import of the configuration.
+- Light on resources: the tray process and the gallery in the background use Windows 11 efficiency mode.
 
 ### Default hotkeys (editable in Settings > Shortcuts)
 
@@ -135,6 +139,8 @@ src/
   pin.rs         screenshot pinned on top
   trayui.rs      modern tray menu (window drawn by the app)
   editor.rs      annotation editor
+  zoom.rs        zoom and move in an image (viewer and editor)
+  icons.rs       icons (Lucide font)
   picker.rs      color picker
   i18n.rs        languages: choice, Windows detection, dates, plurals
   i18n_table.rs  translation table (one row per text)
@@ -144,6 +150,7 @@ src/
     views.rs     viewer, comparison, statistics
     settings.rs  settings page
     ui_kit.rs    themes, palettes and interface components
+    palette.rs   command palette (Ctrl+K)
     hotkeys.rs   hotkey recorder
 ```
 
@@ -188,12 +195,15 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 
 **Galerie**
 - Grille de miniatures arrondies, regroupées par jour, avec recherche, tri, favoris, sélection multiple (avec « Tout sélectionner »), accès direct au dossier et glisser-déposer pour importer des images.
-- Visionneuse (zoom, diaporama, plein écran), comparateur à curseur, statistiques.
-- Menu latéral réductible (Ctrl+B), 12 thèmes et couleur d'accent personnalisable.
+- Visionneuse avec zoom fluide (molette vers le curseur, glisser, double-clic, + − 0 1), diaporama, plein écran ; comparateur à curseur, statistiques.
+- Palette de commandes (Ctrl+K) : quelques lettres pour changer d'onglet, de thème, de dossier ou de tri, ou pour ouvrir une capture.
+- Des animations partout : miniatures qui se soulèvent au survol, captures qui volent de leur miniature à la visionneuse, apparition en cascade, menus et notifications qui glissent.
+- 17 thèmes avec un cercle qui révèle le nouveau thème, une couleur d'accent par thème (« Auto ») ou au choix, icônes Lucide, barre de titre assortie au thème.
+- Menu latéral réductible (Ctrl+B), avec des icônes une fois réduit.
 
 **Éditeur d'annotations**
 - Stylo, formes (rectangle, ellipse, ligne, flèches…), surligneur, flou, texte, étapes numérotées, gomme.
-- Aperçu fidèle au résultat final, annulation et rétablissement illimités, enregistrement en copie ou remplacement de l'original.
+- Aperçu fidèle au résultat final, annulation et rétablissement illimités, zoom (molette, + − 0 1) et déplacement (clic molette ou Espace + glisser), enregistrement en copie ou remplacement de l'original.
 
 **Langues**
 - Français et anglais, plus espagnol, allemand et chinois (traductions non vérifiées).
@@ -203,6 +213,7 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 **Autres**
 - Capture épinglée au premier plan de l'écran, copie des fichiers dans le presse-papiers, export de la sélection.
 - Lancement automatique avec Windows, export/import de la configuration.
+- Léger : le processus du tray et la galerie en arrière-plan utilisent le mode efficacité de Windows 11.
 
 ### Raccourcis par défaut (modifiables dans Paramètres > Raccourcis)
 
@@ -284,6 +295,8 @@ src/
   pin.rs         capture épinglée au premier plan
   trayui.rs      menu moderne de l'icône du tray (fenêtre dessinée par l'appli)
   editor.rs      éditeur d'annotations
+  zoom.rs        zoom et déplacement dans une image (visionneuse et éditeur)
+  icons.rs       icônes (police Lucide)
   picker.rs      sélecteur de couleur
   i18n.rs        langues : choix, détection de Windows, dates, pluriels
   i18n_table.rs  tableau des traductions (une ligne par texte)
@@ -293,6 +306,7 @@ src/
     views.rs     visionneuse, comparateur, statistiques
     settings.rs  page des paramètres
     ui_kit.rs    thèmes, palettes et composants d'interface
+    palette.rs   palette de commandes (Ctrl+K)
     hotkeys.rs   enregistreur de raccourci
 ```
 

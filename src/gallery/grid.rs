@@ -548,30 +548,7 @@ impl App {
         } else {
             (icons::FOLDER, tr("Ce dossier est vide").to_string(), String::new(), ic(icons::FOLDER, tr("Tous les dossiers")))
         };
-        // apparition : l'illustration monte en fondu
-        let k = ease_out((self.grid_at.elapsed().as_secs_f32() / anim::ENTER).min(1.0));
-        if k < 1.0 {
-            ui.ctx().request_repaint();
-        }
-        let acc = self.shown_acc;
-        let mut clicked = false;
-        ui.add_space(ui.available_height() * 0.18 + 20.0 * (1.0 - k));
-        ui.vertical_centered(|ui| {
-            ui.multiply_opacity(k);
-            let (r, _) = ui.allocate_exact_size(vec2(96.0, 96.0), Sense::hover());
-            let p = ui.painter();
-            p.circle_filled(r.center(), 46.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 28));
-            p.circle_filled(r.center(), 34.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 45));
-            p.text(r.center(), Align2::CENTER_CENTER, icon, FontId::proportional(36.0), acc);
-            ui.add_space(14.0);
-            ui.label(bold_text(&title, 20.0));
-            if !text.is_empty() {
-                ui.add_space(4.0);
-                ui.weak(text);
-            }
-            ui.add_space(14.0);
-            clicked = ui.button(button).clicked();
-        });
+        let clicked = empty_view(ui, self.grid_at, self.shown_acc, icon, &title, &text, &button);
         if clicked {
             if self.items.is_empty() {
                 let _ = std::fs::create_dir_all(&self.cfg.save_dir);

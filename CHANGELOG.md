@@ -4,6 +4,36 @@
 
 ## English
 
+### 1.2.0 — November 2026
+
+A big visual update of the gallery: more modern, animated, with icons.
+
+**Animations**
+- Thumbnails fade in as they load, appear in cascade, and lift with a soft shadow on hover.
+- Opening a screenshot: it flies from its thumbnail to the viewer, and back when closing.
+- Sliding side menu, notifications, selection bar; tab and settings changes with a fade.
+- Statistics bars that grow, theme cards and accent dots with bounces and ripples.
+
+**Viewer and editor**
+- New zoom: wheel towards the cursor, drag to move, double-click (fit / actual size), + − 0 1, floating zoom bar.
+- Zoom in the built-in editor too (move with middle-click or Space + drag).
+
+**Look**
+- 5 new themes (Glacier, Mocha, Neon, Sakura, Sky): 17 in total.
+- Switching theme: a circle grows from the click and reveals the new theme.
+- Each theme has its own accent color, with an "Auto" button to follow it.
+- Lucide icons everywhere (menus, toolbars, editor, tray menu, notifications); the collapsed side menu shows the tab icons.
+- Title bar matching the theme (Windows 11), soft shadows, themed scrollbars.
+
+**Comfort**
+- Command palette (Ctrl+K): tabs, settings sections, themes, folders, sorting, actions, and opening a screenshot by name or date.
+- Empty states for an empty gallery, a search without results, no favorites, an empty folder and statistics.
+- Shimmer while thumbnails load.
+
+**Performance**
+- Windows 11 efficiency mode for the tray process (except during a capture) and for the gallery in the background.
+- The list of displayed screenshots is cached instead of being recomputed every frame.
+
 ### 1.1.0 — November 2026
 
 **Gallery**
@@ -76,6 +106,36 @@ First stable release.
 ---
 
 ## Français
+
+### 1.2.0 — novembre 2026
+
+Une grosse mise à jour visuelle de la galerie : plus moderne, animée, avec des icônes.
+
+**Animations**
+- Les miniatures apparaissent en fondu, en cascade, et se soulèvent avec une ombre douce au survol.
+- Ouverture d'une capture : elle vole de sa miniature à la visionneuse, et y retourne à la fermeture.
+- Menu latéral, notifications et barre de sélection qui glissent ; changements d'onglet et de rubrique en fondu.
+- Barres de statistiques qui poussent, cartes de thème et pastilles d'accent avec rebonds et ondes.
+
+**Visionneuse et éditeur**
+- Nouveau zoom : molette vers le curseur, glisser pour déplacer, double-clic (ajuster / taille réelle), + − 0 1, barre de zoom flottante.
+- Zoom aussi dans l'éditeur intégré (déplacement au clic molette ou Espace + glisser).
+
+**Apparence**
+- 5 nouveaux thèmes (Glacier, Moka, Néon, Sakura, Ciel) : 17 au total.
+- Changement de thème : un cercle part du clic et révèle le nouveau thème.
+- Chaque thème a sa couleur d'accent, avec un bouton « Auto » pour la suivre.
+- Icônes Lucide partout (menus, barres d'outils, éditeur, menu du tray, notifications) ; le menu latéral réduit affiche les icônes des onglets.
+- Barre de titre assortie au thème (Windows 11), ombres douces, barres de défilement aux couleurs du thème.
+
+**Confort**
+- Palette de commandes (Ctrl+K) : onglets, rubriques des paramètres, thèmes, dossiers, tri, actions, et ouverture d'une capture par son nom ou sa date.
+- Écrans vides soignés : galerie vide, recherche sans résultat, aucun favori, dossier vide, statistiques.
+- Reflet animé pendant le chargement des miniatures.
+
+**Performances**
+- Mode efficacité de Windows 11 pour le processus du tray (sauf pendant une capture) et pour la galerie en arrière-plan.
+- La liste des captures affichées est gardée en mémoire au lieu d'être recalculée à chaque image.
 
 ### 1.1.0 — novembre 2026
 
