@@ -43,6 +43,16 @@ enum SetCat {
     System,
 }
 
+/// Ce qu'il faut refaire pour annuler une action (bouton « Annuler » d'une notification).
+enum Undo {
+    /// captures mises à la corbeille, et si elles étaient en favori
+    Trash(Vec<(PathBuf, bool)>),
+    /// capture renommée : son nom actuel et l'ancien
+    Rename { now: PathBuf, before: PathBuf },
+    /// réglages d'avant une réinitialisation
+    Cfg(Box<Config>),
+}
+
 #[derive(Clone, Copy, PartialEq)]
 enum Sort {
     Newest,
@@ -123,7 +133,8 @@ struct App {
     editor: Option<Editor>,
     compare: Option<Cmp>,
     recording: Option<usize>, // raccourci en cours d'enregistrement
-    toast: Option<(String, Instant)>,
+    toast: Option<(String, Instant, Option<Undo>)>,
+    undo_next: Option<Undo>, // action annulable liée au prochain message (bouton « Annuler » de la notification)
     rename_dlg: Option<(PathBuf, String)>,
     sidebar_open: bool,
     set_cat: SetCat,
@@ -229,6 +240,7 @@ impl App {
             compare: None,
             recording: None,
             toast: None,
+            undo_next: None,
             rename_dlg: None,
             sidebar_open: ui_state.sidebar,
             set_cat: SetCat::Shortcuts,
@@ -317,8 +329,11 @@ impl App {
     }
 
     fn trash(&mut self, paths: Vec<PathBuf>) {
+        let mut done: Vec<(PathBuf, bool)> = Vec::new();
         for p in &paths {
+            let fav = self.favs.contains(p);
             if trash::delete(p).is_ok() {
+                done.push((p.clone(), fav));
                 let _ = std::fs::remove_file(thumb_path(p));
                 self.thumbs.remove(p);
                 self.favs.remove(p);
@@ -330,9 +345,59 @@ impl App {
         let gone = before - self.items.len();
         if gone > 0 {
             self.status = ic(icons::TRASH, &trf("{0} capture(s) mise(s) à la corbeille", &[&gone]));
+            self.undo_next = Some(Undo::Trash(done));
         }
         self.full = None;
         save_favs(&self.favs);
+    }
+
+    /// Annule une action (bouton « Annuler » de sa notification).
+    fn undo(&mut self, u: Undo) {
+        match u {
+            Undo::Trash(list) => {
+                // on retrouve les fichiers dans la corbeille de Windows (le plus récent s'il y en a plusieurs)
+                // (chemins comparés sans tenir compte de la casse ni du préfixe \\?\ : Windows ne les distingue pas)
+                let key = |p: &Path| {
+                    let s = p.to_string_lossy().replace('/', "\\").to_lowercase();
+                    s.strip_prefix("\\\\?\\").map(str::to_string).unwrap_or(s)
+                };
+                let want: HashSet<String> = list.iter().map(|(p, _)| key(p)).collect();
+                let mut found: HashMap<String, trash::TrashItem> = HashMap::new();
+                if let Ok(items) = trash::os_limited::list() {
+                    for it in items {
+                        let k = key(&it.original_path());
+                        if want.contains(&k) && found.get(&k).map(|o| o.time_deleted < it.time_deleted).unwrap_or(true) {
+                            found.insert(k, it);
+                        }
+                    }
+                }
+                let n = found.len();
+                if n > 0 && trash::os_limited::restore_all(found.into_values()).is_ok() {
+                    for (p, fav) in list {
+                        if fav && p.exists() {
+                            self.favs.insert(p);
+                        }
+                    }
+                    save_favs(&self.favs);
+                    self.items = list_items(&self.cfg.save_dir);
+                    self.status = ic(icons::UNDO, &trf("{0} capture(s) restaurée(s)", &[&n]));
+                } else {
+                    self.status = ic(icons::ALERT, tr("Impossible de restaurer depuis la corbeille"));
+                }
+            }
+            Undo::Rename { now, before } => {
+                let stem = before.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                self.rename_file(&now, &stem);
+                self.undo_next = None; // pas d'« Annuler » sur l'annulation
+                if before.exists() {
+                    self.status = ic(icons::UNDO, tr("Action annulée"));
+                }
+            }
+            Undo::Cfg(prev) => {
+                self.cfg = *prev;
+                self.status = ic(icons::UNDO, tr("Action annulée"));
+            }
+        }
     }
 
     fn hotkey_field(&mut self, idx: usize) -> &mut String {
@@ -443,6 +508,7 @@ impl App {
             }
             self.full = None;
             self.status = ic(icons::RENAME, tr("Capture renommée"));
+            self.undo_next = Some(Undo::Rename { now: newp, before: old.to_path_buf() });
         }
     }
 
@@ -488,30 +554,36 @@ impl eframe::App for App {
         if ctx.input(|i| i.modifiers.command && i.key_pressed(Key::B)) && !ctx.wants_keyboard_input() {
             self.sidebar_open = !self.sidebar_open;
         }
-        // les messages d'état deviennent de petites notifications éphémères
+        // les messages d'état deviennent de petites notifications éphémères ; une action annulable
+        // (corbeille, renommage, réinitialisation) y ajoute un bouton « Annuler »
         if !self.status.is_empty() {
-            self.toast = Some((std::mem::take(&mut self.status), Instant::now()));
+            self.toast = Some((std::mem::take(&mut self.status), Instant::now(), self.undo_next.take()));
         }
-        let toast = self.toast.as_ref().map(|(m, t)| (m.clone(), t.elapsed()));
+        self.undo_next = None;
+        // durée d'affichage : un peu plus longue s'il y a de quoi annuler ; le survol la met en pause
+        let life = |undo: bool| if undo { 6.5_f32 } else { 4.7 };
+        let toast = self.toast.as_ref().map(|(m, t, u)| (m.clone(), t.elapsed().as_secs_f32(), u.is_some()));
+        let mut undo_clicked = false;
         match toast {
-            Some((_, age)) if age > Duration::from_millis(3200) => self.toast = None,
-            Some((msg, age)) => {
+            Some((_, age, u)) if age > life(u) => self.toast = None,
+            Some((msg, age, has_undo)) => {
                 // la notification glisse vers le haut en apparaissant, puis s'efface en fondu
-                let age = age.as_secs_f32();
+                let total = life(has_undo);
                 let enter = ease_out((age / anim::ENTER).min(1.0));
-                let leave = ((3.2 - age) / 0.45).clamp(0.0, 1.0);
-                if age < anim::ENTER || age > 2.75 {
+                let leave = ((total - age) / 0.45).clamp(0.0, 1.0);
+                if age < anim::ENTER || age > total - 0.45 {
                     ctx.request_repaint();
                 } else {
-                    ctx.request_repaint_after(Duration::from_secs_f32(2.75 - age));
+                    ctx.request_repaint_after(Duration::from_secs_f32(total - 0.45 - age));
                 }
-                egui::Area::new(egui::Id::new("toast"))
+                let shown = egui::Area::new(egui::Id::new("toast"))
                     .anchor(Align2::RIGHT_BOTTOM, vec2(-22.0 + 24.0 * (1.0 - leave), -56.0 + 40.0 * (1.0 - enter)))
                     .order(egui::Order::Foreground)
-                    .interactable(false)
+                    .interactable(has_undo)
                     .show(ctx, |ui| {
                         ui.multiply_opacity(enter.min(leave));
-                        egui::Frame::popup(ui.style()).inner_margin(egui::Margin::symmetric(16.0, 10.0)).show(ui, |ui| {
+                        egui::Frame::popup(ui.style()).inner_margin(if has_undo { egui::Margin { left: 16.0, right: 6.0, top: 6.0, bottom: 6.0 } } else { egui::Margin::symmetric(16.0, 10.0) }).show(ui, |ui| {
+                          ui.horizontal(|ui| {
                             // un message qui commence par une icône : l'icône est mise en couleur (réussite, erreur…)
                             let mut chars = msg.chars();
                             match chars.next() {
@@ -535,10 +607,28 @@ impl eframe::App for App {
                                     ui.label(msg);
                                 }
                             }
+                            if has_undo {
+                                ui.add_space(10.0);
+                                if pill(ui, icons::UNDO, tr("Annuler")).on_hover_text(tr("Annule cette action")).clicked() {
+                                    undo_clicked = true;
+                                }
+                            }
+                          });
                         });
                     });
+                // tant que la souris est sur la notification, elle reste affichée
+                if has_undo && shown.response.contains_pointer() && age > anim::ENTER {
+                    if let Some(t) = self.toast.as_mut() {
+                        t.1 = Instant::now() - Duration::from_secs_f32(anim::ENTER);
+                    }
+                }
             }
             None => {}
+        }
+        if undo_clicked {
+            if let Some((_, _, Some(u))) = self.toast.take() {
+                self.undo(u);
+            }
         }
         // fenêtre « Renommer » (depuis le menu clic droit de la galerie)
         let (mut do_rename, mut close) = (None::<(PathBuf, String)>, false);

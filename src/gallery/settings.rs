@@ -47,7 +47,9 @@ impl App {
                     })
                     .clicked()
                 {
-                    self.cfg = Config::default();
+                    let prev = std::mem::take(&mut self.cfg);
+                    self.undo_next = Some(Undo::Cfg(Box::new(prev)));
+                    self.status = ic(icons::RESET, tr("Tous les réglages ont été réinitialisés : pense à enregistrer"));
                 }
             });
         // changement de rubrique : le contenu arrive en fondu depuis la droite
@@ -81,6 +83,7 @@ impl App {
     /// Remet à leur valeur d'origine les réglages d'une rubrique (à enregistrer ensuite avec le bouton du bas).
     pub(super) fn reset_cat(&mut self, cat: SetCat) {
         let d = Config::default();
+        self.undo_next = Some(Undo::Cfg(Box::new(self.cfg.clone())));
         let c = &mut self.cfg;
         match cat {
             SetCat::Shortcuts => {

@@ -143,12 +143,53 @@ pub fn dfmt(long: bool) -> &'static str {
     }
 }
 
-/// Tailles de fichiers : Ko/Mo/Go en français, KB/MB/GB ailleurs.
 /// Vrai si la langue écrit les nombres décimaux avec une virgule.
 pub fn decimal_comma() -> bool {
     matches!(lang(), FR | ES | DE)
 }
 
+/// « N dossiers ».
+pub fn n_folders(n: usize) -> String {
+    match lang() {
+        EN => format!("{n} {}", if n == 1 { "folder" } else { "folders" }),
+        ES => format!("{n} {}", if n == 1 { "carpeta" } else { "carpetas" }),
+        DE => format!("{n} Ordner"),
+        ZH => format!("{n} 个文件夹"),
+        _ => format!("{n} {}", if n > 1 { "dossiers" } else { "dossier" }),
+    }
+}
+
+/// « N jours ».
+pub fn n_days(n: usize) -> String {
+    match lang() {
+        EN => format!("{n} {}", if n == 1 { "day" } else { "days" }),
+        ES => format!("{n} {}", if n == 1 { "día" } else { "días" }),
+        DE => format!("{n} {}", if n == 1 { "Tag" } else { "Tage" }),
+        ZH => format!("{n} 天"),
+        _ => format!("{n} {}", if n > 1 { "jours" } else { "jour" }),
+    }
+}
+
+/// Initiales des jours de la semaine, du lundi au dimanche.
+pub fn weekday_letters() -> [&'static str; 7] {
+    match lang() {
+        EN => ["M", "T", "W", "T", "F", "S", "S"],
+        ES => ["L", "M", "X", "J", "V", "S", "D"],
+        DE => ["M", "D", "M", "D", "F", "S", "S"],
+        ZH => ["一", "二", "三", "四", "五", "六", "日"],
+        _ => ["L", "M", "M", "J", "V", "S", "D"],
+    }
+}
+
+/// Heure de la journée : « 14 h » en français et en espagnol, « 14:00 » ailleurs.
+pub fn hour_label(h: usize) -> String {
+    match lang() {
+        FR | ES => format!("{h} h"),
+        _ => format!("{h}:00"),
+    }
+}
+
+/// Tailles de fichiers : Ko/Mo/Go en français, KB/MB/GB ailleurs.
 pub fn size_units() -> [&'static str; 3] {
     if lang() == FR {
         ["Ko", "Mo", "Go"]

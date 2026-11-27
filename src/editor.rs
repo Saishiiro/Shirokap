@@ -482,6 +482,69 @@ fn tool_btn(ui: &mut egui::Ui, selected: bool, icon: &str, label: &str, chevron:
     resp
 }
 
+/// Petit dessin d'une forme (vignette du menu « Formes »), dans `r`.
+fn shape_glyph(p: &egui::Painter, r: Rect, kind: ShapeKind, color: Color32) {
+    let st = Stroke::new(1.8_f32, color);
+    let (a, b) = (r.left_bottom(), r.right_top());
+    // pointe de flèche en `to`, venant de `from`
+    let head = |from: Pos2, to: Pos2| {
+        let d = (to - from).normalized();
+        let n = vec2(-d.y, d.x);
+        p.line_segment([to, to - d * 6.0 + n * 4.0], st);
+        p.line_segment([to, to - d * 6.0 - n * 4.0], st);
+    };
+    match kind {
+        ShapeKind::Rect => {
+            p.rect_stroke(r, 2.5, st);
+        }
+        ShapeKind::RectFill => {
+            p.rect_filled(r, 2.5, color);
+        }
+        ShapeKind::Ellipse => {
+            p.add(egui::Shape::ellipse_stroke(r.center(), r.size() / 2.0, st));
+        }
+        ShapeKind::EllipseFill => {
+            p.add(egui::Shape::ellipse_filled(r.center(), r.size() / 2.0, color));
+        }
+        ShapeKind::Line => {
+            p.line_segment([a, b], st);
+        }
+        ShapeKind::Arrow => {
+            p.line_segment([a, b], st);
+            head(a, b);
+        }
+        ShapeKind::DoubleArrow => {
+            p.line_segment([a, b], st);
+            head(a, b);
+            head(b, a);
+        }
+    }
+}
+
+/// Ligne du menu « Formes » : vignette de la forme, son nom, une coche si elle est choisie.
+fn shape_row(ui: &mut egui::Ui, w: f32, selected: bool, kind: ShapeKind, label: &str) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(w, 34.0), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(resp.id.with("hov"), resp.hovered(), 0.15);
+    let v = ui.visuals();
+    let p = ui.painter();
+    let fg = if selected { v.selection.stroke.color } else { v.text_color() };
+    if selected {
+        p.rect_filled(rect, 9.0, v.selection.bg_fill);
+    } else if hk > 0.01 {
+        p.rect_filled(rect, 9.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(hk));
+    }
+    let glyph = Rect::from_center_size(pos2(rect.min.x + 22.0, rect.center().y), vec2(20.0, 14.0));
+    shape_glyph(p, glyph, kind, fg);
+    p.text(pos2(rect.min.x + 44.0, rect.center().y), Align2::LEFT_CENTER, label, FontId::proportional(14.5), fg);
+    if selected {
+        crate::gallery::ui_kit::icon_check(p, pos2(rect.right() - 18.0, rect.center().y), fg);
+    }
+    resp
+}
+
 pub fn dropdown(ui: &mut egui::Ui, label: &str, active: bool, add: impl FnOnce(&mut egui::Ui)) {
     let acc = crate::gallery::ui_kit::accent_of(ui.visuals());
     // espaces insécables en fin de libellé : ils réservent la place de la flèche dessinée ensuite
@@ -655,9 +718,17 @@ impl Editor {
                                 ui.memory_mut(|m| m.toggle_popup(pop));
                             }
                             egui::popup::popup_below_widget(ui, pop, &sr, egui::PopupCloseBehavior::CloseOnClick, |ui| {
-                                ui.set_min_width(170.0);
+                                ui.spacing_mut().item_spacing.y = 2.0;
+                                // largeur : le plus long des noms + la vignette de la forme + la coche
+                                let w = SHAPES
+                                    .iter()
+                                    .map(|s| ui.painter().layout_no_wrap(tr(s.1).to_string(), FontId::proportional(14.5), Color32::PLACEHOLDER).size().x)
+                                    .fold(0.0_f32, f32::max)
+                                    + 92.0;
+                                let w = w.max(200.0);
+                                ui.set_min_width(w);
                                 for (k, name) in SHAPES {
-                                    if ui.selectable_label(self.tool == Tool::Shape && self.shape == k, tr(name)).clicked() {
+                                    if shape_row(ui, w, self.tool == Tool::Shape && self.shape == k, k, tr(name)).clicked() {
                                         self.shape = k;
                                         self.tool = Tool::Shape;
                                     }
@@ -838,7 +909,9 @@ impl Editor {
         let to_img = |s: Pos2| ((s - rect.min) / scale).to_pos2();
         let panning = self.zoom.panning(ui, &resp, pan);
         let space = ui.input(|i| i.key_down(Key::Space)) && self.pending.is_none() && self.cur.is_none();
-        let on_img = |p: Pos2| rect.contains(p);
+        // la barre de zoom flotte au-dessus de l'image : sous elle, on ne dessine pas et la souris reste normale
+        let over_bar = self.zoom.over_controls(ui, area);
+        let on_img = |p: Pos2| rect.contains(p) && !over_bar;
 
         // ----- clics simples -----
         if resp.clicked() && !space {

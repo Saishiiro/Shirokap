@@ -1,5 +1,6 @@
 // Visionneuse, comparateur et statistiques.
 use super::*;
+use eframe::egui::Vec2;
 
 impl App {
     /// Image suivante du diaporama : toujours par date de capture, dans l'ordre choisi,
@@ -38,8 +39,12 @@ impl App {
         }
         let acc = self.shown_acc;
         let since = self.tab_at.elapsed().as_secs_f32();
+        // hauteur visible de la page : les panneaux se partagent la place laissée sous les tuiles
+        let full_h = ui.available_height();
         egui::ScrollArea::vertical().auto_shrink([false; 2]).show(ui, |ui| {
             ui.set_max_width(ui.available_width() - 12.0);
+            // les écarts entre blocs sont posés à la main (les panneaux doivent tomber pile en bas de la page)
+            ui.spacing_mut().item_spacing.y = 0.0;
             let v = ui.visuals().clone();
             let inset = v.extreme_bg_color;
             let gap = 10.0;
@@ -85,13 +90,20 @@ impl App {
             });
             ui.add_space(gap);
 
-            // --- 7 derniers jours (barres verticales) et répartition par dossier, côte à côte ---
+            // --- données des panneaux : captures par jour et par heure, par dossier ---
+            let mut per_day: HashMap<chrono::NaiveDate, usize> = HashMap::new();
+            let mut per_hour = [0usize; 24];
+            for i in &self.items {
+                let dt = chrono::DateTime::<chrono::Local>::from(i.modified);
+                *per_day.entry(dt.date_naive()).or_default() += 1;
+                per_hour[chrono::Timelike::hour(&dt) as usize % 24] += 1;
+            }
             let counts: Vec<(String, usize)> = (0..7)
                 .rev()
                 .map(|d| {
                     let day = today - chrono::Duration::days(d);
                     let label = if d == 0 { tr("Aujourd'hui").to_string() } else { day.format(dfmt(false)).to_string() };
-                    (label, self.items.iter().filter(|i| day_of(i.modified) == day).count())
+                    (label, per_day.get(&day).copied().unwrap_or(0))
                 })
                 .collect();
             let mut by: HashMap<String, (usize, u64)> = HashMap::new();
@@ -102,106 +114,35 @@ impl App {
                 e.1 += i.size;
             }
             let mut folders: Vec<(String, (usize, u64))> = by.into_iter().collect();
-            folders.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
-            folders.truncate(8);
+            folders.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(&b.0)));
+
+            // --- quatre panneaux : en grand, deux rangées qui se partagent toute la hauteur de la page ;
+            // en étroit, les uns sous les autres ---
             let w = ui.available_width();
             let side = w > 760.0;
             let (cw, fw) = if side { let c = ((w - gap) * 0.6).floor(); (c, w - gap - c) } else { (w, w) };
-            let panel_h = 300.0_f32.max(76.0 + folders.len() as f32 * 44.0);
-            let chart = |ui: &mut egui::Ui| {
-                egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
-                    ui.set_width(cw - 40.0);
-                    ui.set_height(panel_h - 40.0);
-                    // le panneau peut être placé dans une ligne : son contenu, lui, s'empile de haut en bas
-                    ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(icons::CALENDAR).color(v.weak_text_color()));
-                        ui.label(bold_text(tr("7 derniers jours"), 15.0));
-                    });
-                    ui.add_space(8.0);
-                    let (area, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
-                    let max = counts.iter().map(|c| c.1).max().unwrap_or(1).max(1);
-                    let n = counts.len() as f32;
-                    let colw = area.width() / n;
-                    let bw = (colw * 0.55).min(46.0);
-                    let label_h = 22.0;
-                    let num_h = 22.0;
-                    let bar_max = area.height() - label_h - num_h;
-                    let p = ui.painter();
-                    for (i, (label, c)) in counts.iter().enumerate() {
-                        // les barres poussent l'une après l'autre en arrivant sur la page
-                        let grow = ease_out(((since - 0.12 - i as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
-                        if grow < 1.0 {
-                            ui.ctx().request_repaint();
-                        }
-                        let today_col = i + 1 == counts.len();
-                        let cx = area.min.x + colw * (i as f32 + 0.5);
-                        let h = if *c == 0 { 6.0 } else { (bar_max * *c as f32 / max as f32).max(10.0) } * grow;
-                        let bottom = area.max.y - label_h;
-                        let bar = Rect::from_min_max(pos2(cx - bw / 2.0, bottom - h), pos2(cx + bw / 2.0, bottom));
-                        let fill = if today_col {
-                            acc
-                        } else if *c > 0 {
-                            v.widgets.hovered.weak_bg_fill
-                        } else {
-                            v.faint_bg_color
-                        };
-                        p.rect_filled(bar, Rounding { nw: 9.0, ne: 9.0, sw: 4.0, se: 4.0 }, fill);
-                        let shown = (*c as f32 * grow).round() as usize;
-                        let num_col = if today_col { acc.lerp_to_gamma(v.text_color(), 0.25) } else if *c > 0 { v.text_color() } else { v.weak_text_color() };
-                        p.text(pos2(cx, bar.min.y - 6.0), Align2::CENTER_BOTTOM, shown.to_string(), FontId::new(13.5, egui::FontFamily::Name("bold".into())), num_col);
-                        let lf = if today_col { FontId::new(12.5, egui::FontFamily::Name("bold".into())) } else { FontId::proportional(12.5) };
-                        p.text(pos2(cx, area.max.y - 2.0), Align2::CENTER_BOTTOM, label, lf, if today_col { v.text_color() } else { v.weak_text_color() });
-                    }
-                    });
-                });
-            };
-            let palette_cols = [acc, col(244, 114, 182), col(56, 189, 248), col(251, 191, 36), col(52, 211, 153), col(251, 146, 60), col(167, 139, 250), col(148, 163, 184)];
-            let folders_ui = |ui: &mut egui::Ui| {
-                egui::Frame::none().fill(inset).rounding(14.0).inner_margin(egui::Margin::same(20.0)).show(ui, |ui| {
-                    ui.set_width(fw - 40.0);
-                    ui.set_min_height(panel_h - 40.0);
-                    ui.vertical(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new(icons::FOLDER).color(v.weak_text_color()));
-                        ui.label(bold_text(tr("Dossiers / jeux"), 15.0));
-                    });
-                    ui.add_space(6.0);
-                    let top = folders.first().map(|f| f.1 .0).unwrap_or(1).max(1);
-                    for (n, (name, (c, sz))) in folders.iter().enumerate() {
-                        let grow = ease_out(((since - 0.2 - n as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
-                        // nombre et poids calés à droite ; le nom prend le reste (coupé avec « … » s'il est long)
-                        ui.horizontal(|ui| {
-                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                ui.label(egui::RichText::new(format!("{} · {}", n_captures(*c), human(*sz))).size(12.5).color(v.weak_text_color()));
-                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                                    ui.add(egui::Label::new(bold_text(name, 14.0)).truncate());
-                                });
-                            });
-                        });
-                        let (track, _) = ui.allocate_exact_size(vec2(ui.available_width(), 8.0), Sense::hover());
-                        let p = ui.painter();
-                        p.rect_filled(track, 4.0, v.faint_bg_color);
-                        let fill_w = (track.width() * *c as f32 / top as f32).max(8.0) * grow;
-                        p.rect_filled(Rect::from_min_size(track.min, vec2(fill_w, track.height())), 4.0, palette_cols[n % palette_cols.len()]);
-                        if grow < 1.0 {
-                            ui.ctx().request_repaint();
-                        }
-                        ui.add_space(6.0);
-                    }
-                    });
-                });
-            };
             if side {
+                let row_h = ((full_h - tile_h - 3.0 * gap - 4.0) / 2.0).floor().max(250.0);
                 ui.horizontal_top(|ui| {
                     ui.spacing_mut().item_spacing.x = gap;
-                    chart(ui);
-                    folders_ui(ui);
+                    week_panel(ui, vec2(cw, row_h), since, &counts, acc);
+                    folders_panel(ui, vec2(fw, row_h), since, &folders, acc);
+                });
+                ui.add_space(gap);
+                ui.horizontal_top(|ui| {
+                    ui.spacing_mut().item_spacing.x = gap;
+                    heat_panel(ui, vec2(cw, row_h), since, &per_day, today, acc);
+                    hours_panel(ui, vec2(fw, row_h), since, &per_hour, acc);
                 });
             } else {
-                chart(ui);
+                let fold_h = (PANEL_TOP + 40.0 + FOLDER_STEP * folders.len().min(8) as f32 - 8.0).max(200.0);
+                week_panel(ui, vec2(w, 280.0), since, &counts, acc);
                 ui.add_space(gap);
-                folders_ui(ui);
+                folders_panel(ui, vec2(w, fold_h), since, &folders, acc);
+                ui.add_space(gap);
+                heat_panel(ui, vec2(w, 250.0), since, &per_day, today, acc);
+                ui.add_space(gap);
+                hours_panel(ui, vec2(w, 240.0), since, &per_hour, acc);
             }
             ui.add_space(12.0);
         });
@@ -534,11 +475,7 @@ fn tile_content(p: &egui::Painter, r: Rect, icon: &str, tint: Color32, solid: bo
         let fg = if dark { tint.lerp_to_gamma(Color32::WHITE, 0.3) } else { tint.lerp_to_gamma(Color32::BLACK, 0.3) };
         p.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), fg);
     }
-    let fit = |text: &str, font: FontId, color: Color32, max_w: f32| {
-        let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
-        job.wrap = egui::text::TextWrapping { max_width: max_w.max(10.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
-        p.layout_job(job)
-    };
+    let fit = |text: &str, font: FontId, color: Color32, max_w: f32| fit_galley(p, text, font, color, max_w);
     let lab = fit(label, FontId::new(13.5, egui::FontFamily::Name("bold".into())), v.text_color(), inner.max.x - tile.max.x - 10.0);
     p.galley(pos2(tile.max.x + 10.0, tile.center().y - lab.size().y / 2.0), lab, v.text_color());
     // chiffre en bas à droite, unité plus petite et plus discrète
@@ -554,5 +491,285 @@ fn tile_content(p: &egui::Painter, r: Rect, icon: &str, tint: Color32, solid: bo
         let g = fit(sub, FontId::proportional(12.0), v.weak_text_color(), inner.width());
         let y = (tile.max.y + vr.min.y) / 2.0 - g.size().y / 2.0;
         p.galley(pos2(inner.min.x, y), g, v.weak_text_color());
+    }
+}
+
+/// Texte sur une ligne, coupé avec « … » s'il dépasse `max_w`.
+fn fit_galley(p: &egui::Painter, text: &str, font: FontId, color: Color32, max_w: f32) -> std::sync::Arc<egui::Galley> {
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+    job.wrap = egui::text::TextWrapping { max_width: max_w.max(10.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
+    p.layout_job(job)
+}
+
+fn bold(size: f32) -> FontId {
+    FontId::new(size, egui::FontFamily::Name("bold".into()))
+}
+
+/// Hauteur du titre d'un panneau (avec l'espace qui le suit).
+const PANEL_TOP: f32 = 34.0;
+/// Hauteur d'une ligne de la liste des dossiers (avec l'espace qui la suit).
+const FOLDER_STEP: f32 = 48.0;
+
+/// Panneau des statistiques : fond en retrait, titre (icône + nom) et, à droite, une info discrète.
+/// Il arrive en fondu (`n` : son rang, pour le décalage). Renvoie la zone libre sous le titre et un
+/// pinceau à l'opacité du fondu.
+#[allow(clippy::too_many_arguments)]
+fn stat_panel(ui: &mut egui::Ui, size: Vec2, since: f32, n: usize, icon: &str, title: &str, right: &str) -> (Rect, egui::Painter) {
+    let (r, _) = ui.allocate_exact_size(size, Sense::hover());
+    let k = ease_out(((since - 0.1 - 0.06 * n as f32) / 0.5).clamp(0.0, 1.0));
+    if k < 1.0 {
+        ui.ctx().request_repaint();
+    }
+    let v = ui.visuals();
+    let mut p = ui.painter().clone();
+    p.multiply_opacity(k);
+    let r = r.translate(vec2(0.0, 10.0 * (1.0 - k)));
+    p.rect_filled(r, 14.0, v.extreme_bg_color);
+    let inner = r.shrink(20.0);
+    let y = inner.min.y + 11.0;
+    let ig = p.text(pos2(inner.min.x, y), Align2::LEFT_CENTER, icon, FontId::proportional(15.0), v.weak_text_color());
+    let tg = fit_galley(&p, title, bold(15.0), v.text_color(), inner.max.x - ig.max.x - 8.0);
+    let title_end = ig.max.x + 8.0 + tg.size().x;
+    p.galley(pos2(ig.max.x + 8.0, y - tg.size().y / 2.0), tg, v.text_color());
+    let room = inner.max.x - title_end - 16.0;
+    if !right.is_empty() && room > 40.0 {
+        let g = fit_galley(&p, right, FontId::proportional(12.5), v.weak_text_color(), room);
+        p.galley(pos2(inner.max.x - g.size().x, y - g.size().y / 2.0), g, v.weak_text_color());
+    }
+    (Rect::from_min_max(pos2(inner.min.x, inner.min.y + PANEL_TOP), inner.max), p)
+}
+
+/// « 7 derniers jours » : une barre par jour, aujourd'hui en couleur d'accent.
+fn week_panel(ui: &mut egui::Ui, size: Vec2, since: f32, counts: &[(String, usize)], acc: Color32) {
+    let sum: usize = counts.iter().map(|c| c.1).sum();
+    let (area, p) = stat_panel(ui, size, since, 0, icons::CALENDAR, tr("7 derniers jours"), &n_captures(sum));
+    let v = ui.visuals().clone();
+    let max = counts.iter().map(|c| c.1).max().unwrap_or(1).max(1);
+    let colw = area.width() / counts.len().max(1) as f32;
+    let bw = (colw * 0.55).min(46.0);
+    let (label_h, num_h) = (22.0, 22.0);
+    let bar_max = area.height() - label_h - num_h;
+    for (i, (label, c)) in counts.iter().enumerate() {
+        // les barres poussent l'une après l'autre en arrivant sur la page
+        let grow = ease_out(((since - 0.12 - i as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
+        if grow < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        let today_col = i + 1 == counts.len();
+        let cx = area.min.x + colw * (i as f32 + 0.5);
+        let h = if *c == 0 { 6.0 } else { (bar_max * *c as f32 / max as f32).max(10.0) } * grow;
+        let bottom = area.max.y - label_h;
+        let bar = Rect::from_min_max(pos2(cx - bw / 2.0, bottom - h), pos2(cx + bw / 2.0, bottom));
+        let fill = if today_col {
+            acc
+        } else if *c > 0 {
+            v.widgets.hovered.weak_bg_fill
+        } else {
+            v.faint_bg_color
+        };
+        p.rect_filled(bar, Rounding { nw: 9.0, ne: 9.0, sw: 4.0, se: 4.0 }, fill);
+        let shown = (*c as f32 * grow).round() as usize;
+        let num_col = if today_col { acc.lerp_to_gamma(v.text_color(), 0.25) } else if *c > 0 { v.text_color() } else { v.weak_text_color() };
+        p.text(pos2(cx, bar.min.y - 6.0), Align2::CENTER_BOTTOM, shown.to_string(), bold(13.5), num_col);
+        let lf = if today_col { bold(12.5) } else { FontId::proportional(12.5) };
+        p.text(pos2(cx, area.max.y - 2.0), Align2::CENTER_BOTTOM, label, lf, if today_col { v.text_color() } else { v.weak_text_color() });
+    }
+}
+
+/// « Dossiers / jeux » : autant de dossiers que la place le permet, les suivants regroupés en « N autres ».
+fn folders_panel(ui: &mut egui::Ui, size: Vec2, since: f32, folders: &[(String, (usize, u64))], acc: Color32) {
+    let (area, p) = stat_panel(ui, size, since, 1, icons::FOLDER, tr("Dossiers / jeux"), &n_folders(folders.len()));
+    let v = ui.visuals().clone();
+    let colors = [acc, col(244, 114, 182), col(56, 189, 248), col(251, 191, 36), col(52, 211, 153), col(251, 146, 60), col(167, 139, 250), col(45, 212, 191)];
+    let fit_rows = (((area.height() + 8.0) / FOLDER_STEP).floor() as usize).max(1);
+    let mut rows: Vec<(String, usize, u64, Color32)> = Vec::new();
+    if folders.len() > fit_rows {
+        let keep = fit_rows - 1;
+        for (n, (name, (c, sz))) in folders[..keep].iter().enumerate() {
+            rows.push((name.clone(), *c, *sz, colors[n % colors.len()]));
+        }
+        let rest = &folders[keep..];
+        rows.push((
+            trf("{0} autres dossiers", &[&rest.len()]),
+            rest.iter().map(|f| f.1 .0).sum(),
+            rest.iter().map(|f| f.1 .1).sum(),
+            v.weak_text_color(),
+        ));
+    } else {
+        for (n, (name, (c, sz))) in folders.iter().enumerate() {
+            rows.push((name.clone(), *c, *sz, colors[n % colors.len()]));
+        }
+    }
+    let top = rows.iter().map(|r| r.1).max().unwrap_or(1).max(1);
+    for (n, (name, c, sz, color)) in rows.iter().enumerate() {
+        let grow = ease_out(((since - 0.2 - n as f32 * 0.06) / 0.7).clamp(0.0, 1.0));
+        if grow < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        let r = Rect::from_min_size(pos2(area.min.x, area.min.y + n as f32 * FOLDER_STEP), vec2(area.width(), FOLDER_STEP - 8.0));
+        // nombre et poids calés à droite ; le nom prend le reste (coupé avec « … » s'il est long)
+        let y = r.min.y + 10.0;
+        let info = p.text(pos2(r.max.x, y), Align2::RIGHT_CENTER, format!("{} · {}", n_captures(*c), human(*sz)), FontId::proportional(12.5), v.weak_text_color());
+        let g = fit_galley(&p, name, bold(14.0), v.text_color(), info.min.x - r.min.x - 12.0);
+        p.galley(pos2(r.min.x, y - g.size().y / 2.0), g, v.text_color());
+        let track = Rect::from_min_size(pos2(r.min.x, r.max.y - 8.0), vec2(r.width(), 8.0));
+        p.rect_filled(track, 4.0, v.faint_bg_color);
+        let fill_w = (track.width() * *c as f32 / top as f32).max(8.0) * grow;
+        p.rect_filled(Rect::from_min_size(track.min, vec2(fill_w, track.height())), 4.0, *color);
+    }
+}
+
+/// Jours d'affilée avec au moins une capture : la série en cours (jusqu'à aujourd'hui, ou hier si
+/// rien n'a encore été capturé aujourd'hui) et le record.
+fn streaks(per_day: &HashMap<chrono::NaiveDate, usize>, today: chrono::NaiveDate) -> (usize, usize) {
+    let one = chrono::Duration::days(1);
+    let mut d = if per_day.contains_key(&today) { today } else { today - one };
+    let mut cur = 0;
+    while per_day.contains_key(&d) {
+        cur += 1;
+        d -= one;
+    }
+    let mut days: Vec<&chrono::NaiveDate> = per_day.keys().collect();
+    days.sort();
+    let (mut best, mut run) = (0, 0);
+    let mut prev: Option<chrono::NaiveDate> = None;
+    for &d in days {
+        run = if prev.map(|p| p + one == d).unwrap_or(false) { run + 1 } else { 1 };
+        best = best.max(run);
+        prev = Some(d);
+    }
+    (cur, best)
+}
+
+/// Calendrier d'activité : une case par jour (colonnes = semaines, lignes = lundi → dimanche),
+/// plus la couleur est vive, plus il y a de captures. Le nombre de semaines suit la largeur.
+fn heat_panel(ui: &mut egui::Ui, size: Vec2, since: f32, per_day: &HashMap<chrono::NaiveDate, usize>, today: chrono::NaiveDate, acc: Color32) {
+    use chrono::Datelike;
+    let (g, label_w, legend_h) = (4.0, 26.0, 30.0);
+    let avail = vec2(size.x - 40.0 - label_w, size.y - 40.0 - PANEL_TOP - legend_h);
+    let cell = ((avail.y + g) / 7.0 - g).clamp(10.0, 26.0).floor();
+    let weeks = (((avail.x + g) / (cell + g)).floor() as usize).clamp(4, 53);
+    let monday = today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
+    let start = monday - chrono::Duration::weeks(weeks as i64 - 1);
+    let in_range = |d: &chrono::NaiveDate| *d >= start && *d <= today;
+    let total: usize = per_day.iter().filter(|(d, _)| in_range(d)).map(|(_, c)| *c).sum();
+    let max = per_day.iter().filter(|(d, _)| in_range(d)).map(|(_, c)| *c).max().unwrap_or(1).max(1);
+    let title = trf("Activité des {0} dernières semaines", &[&weeks]);
+    let (area, p) = stat_panel(ui, size, since, 2, icons::HISTORY, &title, &n_captures(total));
+    let v = ui.visuals().clone();
+    let inset = v.extreme_bg_color;
+    let level = |c: usize| -> Color32 {
+        if c == 0 {
+            v.faint_bg_color
+        } else {
+            let t = [0.3, 0.52, 0.76, 1.0][((c as f32 / max as f32 * 4.0).ceil() as usize).clamp(1, 4) - 1];
+            inset.lerp_to_gamma(acc, t)
+        }
+    };
+    // grille et légende centrées dans la place disponible
+    let grid = vec2(weeks as f32 * (cell + g) - g, 7.0 * (cell + g) - g);
+    let block = vec2(label_w + grid.x, grid.y + legend_h);
+    let o = area.min + ((area.size() - block) / 2.0).max(Vec2::ZERO);
+    let gx = o.x + label_w;
+    let grid_rect = Rect::from_min_size(pos2(gx, o.y), grid);
+    let letters = weekday_letters();
+    for (r, l) in letters.iter().enumerate() {
+        if cell >= 15.0 || r % 2 == 0 {
+            let y = o.y + r as f32 * (cell + g) + cell / 2.0;
+            p.text(pos2(o.x, y), Align2::LEFT_CENTER, *l, FontId::proportional(11.5), v.weak_text_color());
+        }
+    }
+    let hover = ui.interact(grid_rect, ui.id().with("heat"), Sense::hover());
+    let hover_cell = hover.hover_pos().map(|q| (((q.x - gx) / (cell + g)).floor() as i64, ((q.y - o.y) / (cell + g)).floor() as i64));
+    let mut tip: Option<String> = None;
+    for c in 0..weeks {
+        // les colonnes apparaissent de gauche à droite
+        let k = ease_out(((since - 0.25 - c as f32 * 0.02) / 0.45).clamp(0.0, 1.0));
+        if k < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        for r in 0..7 {
+            let d = start + chrono::Duration::days((c * 7 + r) as i64);
+            if d > today {
+                break;
+            }
+            let n = per_day.get(&d).copied().unwrap_or(0);
+            let cr = Rect::from_min_size(pos2(gx + c as f32 * (cell + g), o.y + r as f32 * (cell + g)), vec2(cell, cell));
+            let fill = level(n);
+            p.rect_filled(cr, (cell * 0.24).round(), fill.gamma_multiply(k));
+            if d == today {
+                p.rect_stroke(cr.shrink(0.5), (cell * 0.24).round(), Stroke::new(1.5_f32, v.text_color()));
+            }
+            if hover_cell == Some((c as i64, r as i64)) {
+                p.rect_stroke(cr.expand(1.5), (cell * 0.24).round() + 1.5, Stroke::new(1.5_f32, v.text_color().gamma_multiply(0.7)));
+                tip = Some(format!("{}\n{}", d.format(dfmt(true)), n_captures(n)));
+            }
+        }
+    }
+    if let Some(t) = tip {
+        hover.on_hover_text_at_pointer(t);
+    }
+    // légende : séries à gauche, échelle « Moins … Plus » à droite
+    let ly = grid_rect.max.y + legend_h / 2.0 + 3.0;
+    let sw = 11.0;
+    let mut x = grid_rect.max.x;
+    let plus = p.text(pos2(x, ly), Align2::RIGHT_CENTER, tr("Plus"), FontId::proportional(11.5), v.weak_text_color());
+    x = plus.min.x - 6.0;
+    for t in [1.0, 0.76, 0.52, 0.3] {
+        p.rect_filled(Rect::from_min_size(pos2(x - sw, ly - sw / 2.0), vec2(sw, sw)), 3.0, inset.lerp_to_gamma(acc, t));
+        x -= sw + 3.0;
+    }
+    p.rect_filled(Rect::from_min_size(pos2(x - sw, ly - sw / 2.0), vec2(sw, sw)), 3.0, v.faint_bg_color);
+    x -= sw + 6.0;
+    let moins = p.text(pos2(x, ly), Align2::RIGHT_CENTER, tr("Moins"), FontId::proportional(11.5), v.weak_text_color());
+    let (cur, best) = streaks(per_day, today);
+    let s = trf("Série en cours : {0} · record : {1}", &[&n_days(cur), &n_days(best)]);
+    let sg = fit_galley(&p, &s, FontId::proportional(12.0), v.weak_text_color(), moins.min.x - 16.0 - o.x);
+    p.galley(pos2(o.x, ly - sg.size().y / 2.0), sg, v.weak_text_color());
+}
+
+/// « Heures de capture » : une barre par heure de la journée, l'heure la plus active en couleur d'accent.
+fn hours_panel(ui: &mut egui::Ui, size: Vec2, since: f32, per_hour: &[usize; 24], acc: Color32) {
+    let max = per_hour.iter().copied().max().unwrap_or(0);
+    let peak = per_hour.iter().position(|&c| c == max).unwrap_or(0);
+    let right = if max > 0 { trf("Pic : {0}", &[&hour_label(peak)]) } else { String::new() };
+    let (area, p) = stat_panel(ui, size, since, 3, icons::CLOCK, tr("Heures de capture"), &right);
+    let v = ui.visuals().clone();
+    let colw = area.width() / 24.0;
+    let bw = (colw * 0.62).clamp(3.0, 18.0);
+    let label_h = 20.0;
+    let bottom = area.max.y - label_h;
+    let bar_max = area.height() - label_h - 4.0;
+    let hover = ui.interact(area, ui.id().with("hours"), Sense::hover());
+    let hov = hover.hover_pos().map(|q| ((q.x - area.min.x) / colw).floor() as i64);
+    let mut tip: Option<String> = None;
+    for (h, &c) in per_hour.iter().enumerate() {
+        let grow = ease_out(((since - 0.3 - h as f32 * 0.015) / 0.6).clamp(0.0, 1.0));
+        if grow < 1.0 {
+            ui.ctx().request_repaint();
+        }
+        let cx = area.min.x + colw * (h as f32 + 0.5);
+        let bh = if c == 0 { 4.0 } else { (bar_max * c as f32 / max.max(1) as f32).max(6.0) } * grow;
+        let bar = Rect::from_min_max(pos2(cx - bw / 2.0, bottom - bh), pos2(cx + bw / 2.0, bottom));
+        let top_r = (bw / 2.0).min(6.0);
+        let fill = if max > 0 && h == peak {
+            acc
+        } else if c > 0 {
+            v.widgets.hovered.weak_bg_fill
+        } else {
+            v.faint_bg_color
+        };
+        let hovered = hov == Some(h as i64);
+        let fill = if hovered && h != peak { fill.lerp_to_gamma(v.text_color(), 0.15) } else { fill };
+        p.rect_filled(bar, Rounding { nw: top_r, ne: top_r, sw: 2.0, se: 2.0 }, fill);
+        if hovered {
+            tip = Some(format!("{} – {}\n{}", hour_label(h), hour_label((h + 1) % 24), n_captures(c)));
+        }
+        if h % 6 == 0 {
+            p.text(pos2(cx, area.max.y - 2.0), Align2::CENTER_BOTTOM, hour_label(h), FontId::proportional(12.0), v.weak_text_color());
+        }
+    }
+    if let Some(t) = tip {
+        hover.on_hover_text_at_pointer(t);
     }
 }

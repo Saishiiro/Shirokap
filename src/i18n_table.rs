@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 366] = [
+pub static TABLE: [[&str; 5]; 378] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -369,4 +369,16 @@ pub static TABLE: [[&str; 5]; 366] = [
     ["Espace utilisé", "Space used", "Espacio usado", "Belegter Speicher", "已用空间"],
     ["Plus ancienne", "Oldest", "Más antigua", "Älteste", "最早"],
     ["Plus lourde", "Largest", "Más pesada", "Größte", "最大"],
+    ["Annule cette action", "Undo this action", "Deshacer esta acción", "Diese Aktion rückgängig machen", "撤销此操作"],
+    ["{0} capture(s) restaurée(s)", "{0} screenshot(s) restored", "{0} captura(s) restaurada(s)", "{0} Aufnahme(n) wiederhergestellt", "已恢复 {0} 张截图"],
+    ["Impossible de restaurer depuis la corbeille", "Couldn't restore from the Recycle Bin", "No se pudo restaurar desde la papelera", "Wiederherstellen aus dem Papierkorb nicht möglich", "无法从回收站恢复"],
+    ["Action annulée", "Action undone", "Acción deshecha", "Aktion rückgängig gemacht", "已撤销"],
+    ["Tous les réglages ont été réinitialisés : pense à enregistrer", "All settings were reset: remember to save", "Se restablecieron todos los ajustes: no olvides guardar", "Alle Einstellungen zurückgesetzt: Speichern nicht vergessen", "已重置所有设置：记得保存"],
+    ["Activité des {0} dernières semaines", "Activity over the last {0} weeks", "Actividad de las últimas {0} semanas", "Aktivität der letzten {0} Wochen", "最近 {0} 周的活动"],
+    ["Heures de capture", "Capture times", "Horas de captura", "Aufnahmezeiten", "截图时段"],
+    ["Pic : {0}", "Peak: {0}", "Pico: {0}", "Spitze: {0}", "高峰：{0}"],
+    ["{0} autres dossiers", "{0} other folders", "{0} carpetas más", "{0} weitere Ordner", "其他 {0} 个文件夹"],
+    ["Série en cours : {0} · record : {1}", "Current streak: {0} · best: {1}", "Racha actual: {0} · récord: {1}", "Aktuelle Serie: {0} · Rekord: {1}", "当前连续：{0} · 最长：{1}"],
+    ["Moins", "Less", "Menos", "Weniger", "少"],
+    ["Plus", "More", "Más", "Mehr", "多"],
 ];

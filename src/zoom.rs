@@ -201,11 +201,22 @@ impl Zoom {
 
     /// Petite barre flottante en bas de la zone : − · pourcentage · + · ajuster.
     /// Elle apparaît quand la souris bouge au-dessus de l'image et s'efface ensuite.
+    fn bar_rect(area: Rect) -> Rect {
+        let size = vec2(300.0, 42.0);
+        Rect::from_center_size(pos2(area.center().x, area.max.y - 18.0 - size.y / 2.0), size)
+    }
+
+    /// La souris est-elle sur la barre de zoom (quand elle est affichée) ? L'appelant évite alors
+    /// de dessiner ou de cacher la souris dessous.
+    pub fn over_controls(&self, ui: &egui::Ui, area: Rect) -> bool {
+        let now = ui.input(|i| i.time);
+        now - self.last_move < 2.2 && ui.rect_contains_pointer(Self::bar_rect(area).expand(6.0))
+    }
+
     pub fn controls(&mut self, ui: &mut egui::Ui, area: Rect, hint: &str) {
         let ctx = ui.ctx().clone();
         let now = ui.input(|i| i.time);
-        let size = vec2(300.0, 42.0);
-        let bar = Rect::from_center_size(pos2(area.center().x, area.max.y - 18.0 - size.y / 2.0), size);
+        let bar = Self::bar_rect(area);
         let over = ui.rect_contains_pointer(bar.expand(12.0));
         if over {
             self.last_move = now;
