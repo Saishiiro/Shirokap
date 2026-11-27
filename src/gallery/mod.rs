@@ -14,6 +14,7 @@ use std::{
 };
 
 pub(crate) mod form;
+mod welcome;
 mod grid;
 mod palette;
 mod hotkeys;
@@ -126,6 +127,7 @@ struct App {
     status: String,
     stat: (usize, u64),
     rename: Option<(PathBuf, String)>,
+    rename_focus: bool, // donner le focus au champ « Nouveau nom » à son ouverture
     slideshow: bool,
     slide_at: Instant,
     slide_new_first: bool,
@@ -232,6 +234,7 @@ impl App {
             status: String::new(),
             stat: (0, 0),
             rename: None,
+            rename_focus: false,
             slideshow: false,
             slide_at: Instant::now(),
             slide_new_first: ui_state.slide_new_first,
@@ -663,83 +666,7 @@ impl eframe::App for App {
             self.rename_file(&p, &n);
         }
         // écran d'accueil (au premier lancement, ou via Paramètres > Système)
-        // (pas par-dessus l'éditeur ; il peut rester ouvert dans la galerie pendant qu'on est ailleurs)
-        if self.show_welcome && !(self.tab == Tab::Gallery && self.editor.is_some()) {
-            let (mut start, mut custom, mut change) = (false, false, false);
-            let mut keys: Vec<(String, &'static str)> = Vec::new();
-            for (k, d) in [
-                (self.cfg.hotkey.clone(), tr("Capturer l'écran")),
-                (self.cfg.hotkey_region.clone(), tr("Capturer une zone")),
-                (self.cfg.hotkey_window.clone(), tr("Capturer la fenêtre active")),
-                (self.cfg.hotkey_gallery.clone(), tr("Ouvrir la galerie")),
-            ] {
-                if !k.is_empty() {
-                    keys.push((k, d));
-                }
-            }
-            let dir = self.cfg.save_dir.clone();
-            let acc = self.shown_acc;
-            egui::Window::new(tr("Bienvenue"))
-                .title_bar(false)
-                .collapsible(false)
-                .resizable(false)
-                .default_width(560.0)
-                .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
-                .show(ctx, |ui| {
-                    ui.add_space(6.0);
-                    ui.label(bold_text(tr("Bienvenue dans Shirokap"), 26.0));
-                    ui.weak(tr("Une capture d'écran légère, qui tourne discrètement dans la zone de notification."));
-                    ui.add_space(12.0);
-                    ui.label(bold_text(tr("Tes raccourcis"), 16.0));
-                    for (k, d) in &keys {
-                        ui.horizontal(|ui| {
-                            let pill = ui.visuals().widgets.inactive.bg_fill;
-                            egui::Frame::none().fill(pill).rounding(6.0_f32).inner_margin(egui::Margin::symmetric(9.0, 3.0)).show(ui, |ui| {
-                                ui.label(bold_text(k, 14.0));
-                            });
-                            ui.label(*d);
-                        });
-                    }
-                    ui.add_space(8.0);
-                    ui.label(bold_text(tr("Dans la zone de notification"), 16.0));
-                    ui.label(tr("Clic gauche sur l'icône : ouvrir la galerie  ·  clic molette : capturer  ·  clic droit : menu."));
-                    ui.add_space(8.0);
-                    ui.label(bold_text(tr("Tes captures"), 16.0));
-                    ui.horizontal_wrapped(|ui| {
-                        ui.weak(&dir);
-                        if ui.button(tr("Changer…")).clicked() {
-                            change = true;
-                        }
-                    });
-                    ui.add_space(14.0);
-                    ui.horizontal(|ui| {
-                        let go = egui::Button::new(egui::RichText::new(tr("C'est parti")).color(on_accent(acc))).fill(acc);
-                        if ui.add(go).clicked() {
-                            start = true;
-                        }
-                        if ui.button(tr("Personnaliser les raccourcis")).clicked() {
-                            custom = true;
-                        }
-                    });
-                    ui.add_space(4.0);
-                });
-            if change {
-                if let Some(p) = rfd::FileDialog::new().pick_folder() {
-                    self.cfg.save_dir = p.display().to_string();
-                    self.cfg.save();
-                    self.saved = toml::to_string(&self.cfg).unwrap_or_default();
-                    self.items = list_items(&self.cfg.save_dir);
-                }
-            }
-            if custom {
-                self.tab = Tab::Settings;
-                self.set_cat = SetCat::Shortcuts;
-            }
-            if start || custom {
-                self.show_welcome = false;
-                self.save_state();
-            }
-        }
+        self.welcome_ui(ctx);
         if let Some(idx) = self.recording {
             ctx.request_repaint(); // on lit le clavier en continu pendant l'enregistrement
             match poll_hotkey() {

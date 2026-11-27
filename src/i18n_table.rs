@@ -2,7 +2,7 @@
 //! Un texte vide se replie sur l'anglais. Le français et l'anglais sont relus ;
 //! l'espagnol, l'allemand et le chinois sont des traductions non vérifiées.
 
-pub static TABLE: [[&str; 5]; 378] = [
+pub static TABLE: [[&str; 5]; 397] = [
     ["Shirokap (en pause)", "Shirokap (paused)", "Shirokap (en pausa)", "Shirokap (pausiert)", "Shirokap（已暂停）"],
     ["{0} capture, {1} zone", "{0} screenshot, {1} region", "{0} captura, {1} zona", "{0} Aufnahme, {1} Bereich", "{0} 截图，{1} 区域"],
     [" · timelapse actif", " · timelapse on", " · timelapse activo", " · Zeitraffer aktiv", " · 定时截图已开启"],
@@ -381,4 +381,23 @@ pub static TABLE: [[&str; 5]; 378] = [
     ["Série en cours : {0} · record : {1}", "Current streak: {0} · best: {1}", "Racha actual: {0} · récord: {1}", "Aktuelle Serie: {0} · Rekord: {1}", "当前连续：{0} · 最长：{1}"],
     ["Moins", "Less", "Menos", "Weniger", "少"],
     ["Plus", "More", "Más", "Mehr", "多"],
+    ["Actions", "Actions", "Acciones", "Aktionen", "操作"],
+    ["Entrée", "Enter", "Intro", "Enter", "回车"],
+    ["Navigation", "Navigation", "Navegación", "Navigation", "导航"],
+    ["Ajouter aux favoris (F)", "Add to favorites (F)", "Añadir a favoritos (F)", "Zu Favoriten hinzufügen (F)", "加入收藏 (F)"],
+    ["Retirer des favoris (F)", "Remove from favorites (F)", "Quitar de favoritos (F)", "Aus Favoriten entfernen (F)", "取消收藏 (F)"],
+    ["Comparaison", "Comparison", "Comparación", "Vergleich", "对比"],
+    ["Diaporama · clic ou Espace : arrêter", "Slideshow · click or Space: stop", "Presentación · clic o Espacio: detener", "Diashow · Klick oder Leertaste: stoppen", "幻灯片 · 点击或空格：停止"],
+    ["Glisse sur l'image pour déplacer la séparation", "Drag on the image to move the divider", "Arrastra sobre la imagen para mover la separación", "Auf dem Bild ziehen, um die Trennlinie zu verschieben", "在图片上拖动以移动分隔线"],
+    ["Inverser A et B", "Swap A and B", "Intercambiar A y B", "A und B tauschen", "交换 A 和 B"],
+    ["Retour à la galerie (Échap)", "Back to the gallery (Esc)", "Volver a la galería (Esc)", "Zurück zur Galerie (Esc)", "返回图库 (Esc)"],
+    ["Choisis ton thème", "Pick a theme", "Elige un tema", "Wähle ein Design", "选择主题"],
+    ["Clic gauche", "Left click", "Clic izquierdo", "Linksklick", "左键单击"],
+    ["Clic molette", "Middle click", "Clic central", "Mittelklick", "中键单击"],
+    ["Clic droit", "Right click", "Clic derecho", "Rechtsklick", "右键单击"],
+    ["Les autres thèmes et la couleur d'accent sont dans Paramètres › Apparence.", "More themes and the accent color are in Settings › Appearance.", "Más temas y el color de acento están en Ajustes › Apariencia.", "Weitere Designs und die Akzentfarbe findest du unter Einstellungen › Darstellung.", "更多主题和强调色在 设置 › 外观 中。"],
+    ["Ouvrir le menu", "Open the menu", "Abrir el menú", "Menü öffnen", "打开菜单"],
+    ["En pause", "Paused", "En pausa", "Pausiert", "已暂停"],
+    ["Zone", "Region", "Zona", "Bereich", "区域"],
+    ["Écran", "Screen", "Pantalla", "Bildschirm", "屏幕"],
 ];

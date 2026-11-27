@@ -290,6 +290,20 @@ pub(crate) fn pill(ui: &mut egui::Ui, icon: &str, label: &str) -> egui::Response
     ui.add(egui::Button::new(text).rounding(18.0).min_size(vec2(0.0, 36.0)).stroke(Stroke::NONE))
 }
 
+/// Bouton principal : pilule pleine de la couleur d'accent, texte en gras.
+pub(crate) fn accent_pill(ui: &mut egui::Ui, icon: &str, label: &str) -> egui::Response {
+    let acc = accent_of(ui.visuals());
+    let text = if icon.is_empty() { label.to_string() } else { ic(icon, label) };
+    let t = egui::RichText::new(text).color(on_accent(acc)).family(egui::FontFamily::Name("bold".into()));
+    ui.add(egui::Button::new(t).fill(acc).stroke(Stroke::NONE).rounding(18.0).min_size(vec2(0.0, 36.0)))
+}
+
+/// Pilule secondaire dont le texte a sa propre couleur (favori doré, corbeille rouge…).
+pub(crate) fn tinted_pill(ui: &mut egui::Ui, icon: &str, label: &str, color: Color32) -> egui::Response {
+    let text = if icon.is_empty() { label.to_string() } else { ic(icon, label) };
+    ui.add(egui::Button::new(egui::RichText::new(text).color(color)).rounding(18.0).min_size(vec2(0.0, 36.0)).stroke(Stroke::NONE))
+}
+
 /// Bouton discret : transparent, il ne prend une teinte qu'au survol.
 pub(crate) fn ghost(ui: &mut egui::Ui, icon: &str, label: &str) -> egui::Response {
     let text = if icon.is_empty() { label.to_string() } else { ic(icon, label) };

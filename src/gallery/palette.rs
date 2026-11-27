@@ -33,6 +33,48 @@ impl CmdPalette {
     }
 }
 
+/// Groupe d'une commande dans la liste (avec son titre).
+fn group(c: &Cmd) -> usize {
+    match c {
+        Cmd::Tab(_) | Cmd::Cat(_) => 0,
+        Cmd::Refresh | Cmd::SelectAll | Cmd::OpenFolder | Cmd::FavsOnly | Cmd::SortBy(_) | Cmd::Fullscreen | Cmd::Sidebar => 1,
+        Cmd::Theme(_) | Cmd::AccentAuto => 2,
+        Cmd::Folder(_) => 3,
+        Cmd::Open(_) => 4,
+    }
+}
+
+fn group_title(g: usize) -> &'static str {
+    match g {
+        0 => tr("Navigation"),
+        1 => tr("Actions"),
+        2 => tr("Apparence"),
+        3 => tr("Dossiers"),
+        _ => tr("Captures"),
+    }
+}
+
+/// Couleur de la tuile d'icône d'une commande.
+fn tint(c: &Cmd) -> Color32 {
+    match c {
+        Cmd::Tab(Tab::Gallery) => cat_tint(1),
+        Cmd::Tab(Tab::Stats) => cat_tint(4),
+        Cmd::Tab(Tab::Settings) => cat_tint(5),
+        Cmd::Cat(c) => cat_tint(*c as usize),
+        Cmd::FavsOnly => col(251, 191, 36),
+        Cmd::AccentAuto => cat_tint(3),
+        Cmd::Folder(_) => cat_tint(2),
+        Cmd::Open(_) => cat_tint(1),
+        _ => cat_tint(0),
+    }
+}
+
+/// Petite étiquette de touche dont le bord gauche est en `left_center`. Renvoie sa place.
+fn chip_from_left(ui: &egui::Ui, left_center: Pos2, text: &str) -> Rect {
+    let w = ui.painter().layout_no_wrap(text.to_owned(), FontId::proportional(11.5), Color32::PLACEHOLDER).size().x + 16.0;
+    kbd_chip(ui, left_center + vec2(w, 0.0), text)
+}
+
 /// Texte en minuscules et sans accents, pour comparer « parametres » et « Paramètres ».
 fn norm(s: &str) -> String {
     s.to_lowercase()
@@ -104,7 +146,8 @@ impl App {
                 }
             })
             .collect();
-        out.sort_by_key(|x| x.0);
+        // par groupe, et dans chaque groupe les libellés qui commencent par le texte tapé d'abord
+        out.sort_by_key(|x| (group(&x.1 .3), x.0));
         let mut out: Vec<_> = out.into_iter().map(|x| x.1).collect();
         // captures dont le nom correspond (6 au plus)
         if !qn.is_empty() {
@@ -124,7 +167,7 @@ impl App {
     }
 
     /// Écrit un seul réglage dans la configuration enregistrée, sans enregistrer les autres modifications en cours.
-    fn save_one(&mut self, f: impl Fn(&mut Config)) {
+    pub(super) fn save_one(&mut self, f: impl Fn(&mut Config)) {
         f(&mut self.cfg);
         let mut disk = Config::load();
         f(&mut disk);
@@ -223,7 +266,7 @@ impl App {
         None
     }
 
-    /// Dessin de la palette (par-dessus tout).
+    /// Dessin de la palette (par-dessus tout) : un champ de recherche, puis les commandes par groupes.
     pub(super) fn palette_ui(&mut self, ctx: &egui::Context) {
         let opened = match &self.cmd {
             Some(p) => p.opened,
@@ -239,81 +282,146 @@ impl App {
         egui::Area::new(egui::Id::new("cmd_palette")).order(egui::Order::Foreground).fixed_pos(screen.min).show(ctx, |ui| {
             // fond assombri : un clic dessus ferme la palette
             let (_, dim) = ui.allocate_exact_size(screen.size(), Sense::click());
-            ui.painter().rect_filled(screen, 0.0, Color32::from_black_alpha((110.0 * k) as u8));
+            ui.painter().rect_filled(screen, 0.0, Color32::from_black_alpha((120.0 * k) as u8));
             if dim.clicked() {
                 close = true;
             }
-            let w = 600.0_f32.min(screen.width() - 32.0);
-            let top = screen.min.y + screen.height() * 0.14 + 16.0 * (1.0 - k);
+            let w = 640.0_f32.min(screen.width() - 32.0);
+            let top = screen.min.y + screen.height() * 0.12 + 16.0 * (1.0 - k);
             let card = Rect::from_min_size(pos2(screen.center().x - w / 2.0, top), vec2(w, 10.0));
-            let mut cu = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(card.min, vec2(w, screen.height() * 0.7))));
+            let mut cu = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(card.min, vec2(w, screen.height() * 0.8))));
             cu.multiply_opacity(k);
-            egui::Frame::popup(cu.style()).inner_margin(egui::Margin::same(10.0)).rounding(14.0_f32).show(&mut cu, |ui| {
-                ui.set_width(w - 20.0);
-                let p = self.cmd.as_mut().unwrap();
-                let te = egui::TextEdit::singleline(&mut p.query)
-                    .hint_text(ic(icons::COMMAND, tr("Tape une commande, un thème, un dossier ou une capture…")))
-                    .font(FontId::proportional(17.0))
-                    .frame(false)
-                    .desired_width(f32::INFINITY)
-                    .margin(vec2(8.0, 8.0));
-                let r = ui.add(te);
-                if p.focus {
-                    r.request_focus();
-                    p.focus = false;
-                }
-                if r.changed() {
-                    p.sel = 0;
-                }
-                ui.separator();
-                let q = p.query.clone();
-                let sel = p.sel;
-                let list = self.commands(&q);
-                let sel = sel.min(list.len().saturating_sub(1));
-                if list.is_empty() {
-                    ui.add_space(6.0);
-                    ui.weak(format!("  {}", tr("Aucune commande ne correspond.")));
-                    ui.add_space(6.0);
-                }
-                let acc = self.shown_acc;
-                egui::ScrollArea::vertical().max_height(screen.height() * 0.5).show(ui, |ui| {
-                    for (n, (icon, label, hint, c)) in list.into_iter().enumerate() {
-                        let (row, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
-                        let on = n == sel;
-                        if on {
-                            ui.scroll_to_rect(row, None);
-                        }
-                        let v = ui.visuals();
-                        let pnt = ui.painter();
-                        if on {
-                            pnt.rect_filled(row, 8.0, Color32::from_rgba_unmultiplied(acc.r(), acc.g(), acc.b(), 50));
-                        } else if resp.hovered() {
-                            pnt.rect_filled(row, 8.0, v.widgets.hovered.weak_bg_fill);
-                        }
-                        let txt = v.text_color();
-                        pnt.text(row.left_center() + vec2(14.0, 0.0), Align2::LEFT_CENTER, icon, FontId::proportional(17.0), if on { acc } else { txt });
-                        pnt.text(row.left_center() + vec2(44.0, 0.0), Align2::LEFT_CENTER, &label, FontId::proportional(15.0), txt);
-                        if on {
-                            pnt.text(row.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, icons::CORNER, FontId::proportional(15.0), v.weak_text_color());
-                        } else if !hint.is_empty() {
-                            pnt.text(row.right_center() - vec2(12.0, 0.0), Align2::RIGHT_CENTER, &hint, FontId::proportional(12.5), v.weak_text_color());
-                        }
-                        if resp.hovered() && ui.input(|i| i.pointer.is_moving()) {
-                            if let Some(p) = self.cmd.as_mut() {
-                                p.sel = n;
+            let dark = cu.visuals().dark_mode;
+            egui::Frame::none()
+                .fill(cu.visuals().window_fill)
+                .rounding(20.0)
+                .stroke(Stroke::new(1.0_f32, cu.visuals().widgets.noninteractive.bg_stroke.color))
+                .shadow(egui::epaint::Shadow { offset: vec2(0.0, 16.0), blur: 48.0, spread: 0.0, color: Color32::from_black_alpha(if dark { 160 } else { 60 }) })
+                .inner_margin(egui::Margin::same(8.0))
+                .show(&mut cu, |ui| {
+                    ui.set_width(w - 16.0);
+                    ui.spacing_mut().item_spacing.y = 0.0;
+                    let v = ui.visuals().clone();
+                    let weak = v.weak_text_color();
+                    // champ de recherche : loupe à gauche, « Échap » à droite
+                    let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), 52.0), Sense::hover());
+                    ui.painter().text(bar.left_center() + vec2(18.0, 0.0), Align2::LEFT_CENTER, icons::SEARCH, FontId::proportional(19.0), weak);
+                    let esc = kbd_chip(ui, bar.right_center() - vec2(12.0, 0.0), tr("Échap"));
+                    let field = Rect::from_min_max(pos2(bar.min.x + 44.0, bar.min.y), pos2(esc.min.x - 10.0, bar.max.y));
+                    let p = self.cmd.as_mut().unwrap();
+                    let te = egui::TextEdit::singleline(&mut p.query)
+                        .hint_text(tr("Tape une commande, un thème, un dossier ou une capture…"))
+                        .font(FontId::proportional(17.0))
+                        .frame(false)
+                        .desired_width(field.width())
+                        .vertical_align(egui::Align::Center)
+                        .margin(vec2(0.0, 8.0));
+                    let r = ui.put(field, te);
+                    if p.focus {
+                        r.request_focus();
+                        p.focus = false;
+                    }
+                    if r.changed() {
+                        p.sel = 0;
+                    }
+                    let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 9.0), Sense::hover());
+                    ui.painter().hline(line.x_range(), line.center().y, Stroke::new(1.0_f32, v.widgets.noninteractive.bg_stroke.color));
+                    let q = p.query.clone();
+                    let sel = p.sel;
+                    let list = self.commands(&q);
+                    let sel = sel.min(list.len().saturating_sub(1));
+                    if list.is_empty() {
+                        let (r, _) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
+                        ui.painter().text(r.center() - vec2(0.0, 14.0), Align2::CENTER_CENTER, icons::SEARCH_X, FontId::proportional(24.0), weak);
+                        ui.painter().text(r.center() + vec2(0.0, 16.0), Align2::CENTER_CENTER, tr("Aucune commande ne correspond."), FontId::proportional(14.0), weak);
+                    }
+                    let acc = self.shown_acc;
+                    let mut last_group = usize::MAX;
+                    egui::ScrollArea::vertical().max_height((screen.height() * 0.55).min(440.0)).show(ui, |ui| {
+                        ui.spacing_mut().item_spacing.y = 2.0;
+                        for (n, (icon, label, hint, c)) in list.into_iter().enumerate() {
+                            // titre du groupe
+                            let g = group(&c);
+                            if g != last_group {
+                                last_group = g;
+                                let (h, _) = ui.allocate_exact_size(vec2(ui.available_width(), if n == 0 { 26.0 } else { 34.0 }), Sense::hover());
+                                ui.painter().text(pos2(h.min.x + 12.0, h.max.y - 8.0), Align2::LEFT_CENTER, group_title(g), FontId::new(12.0, egui::FontFamily::Name("bold".into())), weak);
+                            }
+                            let (row, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 42.0), Sense::click());
+                            let on = n == sel;
+                            if on {
+                                ui.scroll_to_rect(row, None);
+                            }
+                            if resp.hovered() {
+                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                            }
+                            let pnt = ui.painter();
+                            if on {
+                                pnt.rect_filled(row, 12.0, acc.gamma_multiply(if dark { 0.2 } else { 0.14 }));
+                            } else if resp.hovered() {
+                                pnt.rect_filled(row, 12.0, v.widgets.hovered.weak_bg_fill.gamma_multiply(0.6));
+                            }
+                            // tuile : couleur du thème pour un thème, miniature pour une capture, sinon icône teintée
+                            let tile = Rect::from_center_size(row.left_center() + vec2(24.0, 0.0), vec2(28.0, 28.0));
+                            let thumb = match &c {
+                                Cmd::Open(i) => self.items.get(*i).and_then(|it| self.thumbs.get(&it.path).cloned().flatten()),
+                                _ => None,
+                            };
+                            if let Cmd::Theme(key) = &c {
+                                let tp = palette(key);
+                                pnt.rect_filled(tile, 8.0, tp.win);
+                                pnt.rect_filled(Rect::from_min_max(tile.min + vec2(5.0, 5.0), tile.max - vec2(5.0, 5.0)), 4.0, tp.bg);
+                                // pastille : la couleur d'accent qu'aura le thème
+                                let ta = if self.cfg.accent_auto { let a = theme_accent(key); col(a[0], a[1], a[2]) } else { acc };
+                                pnt.circle_filled(tile.center(), 4.0, ta);
+                                pnt.rect_stroke(tile, 8.0, Stroke::new(1.0_f32, v.widgets.noninteractive.bg_stroke.color));
+                            } else if let Some(t) = thumb {
+                                let ts = t.size_vec2();
+                                let sc = (tile.width() / ts.x).max(tile.height() / ts.y);
+                                let shown = Rect::from_center_size(tile.center(), ts * sc);
+                                pnt.with_clip_rect(tile.intersect(pnt.clip_rect())).image(t.id(), shown, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+                            } else {
+                                let tc = tint(&c);
+                                let soft = Color32::from_rgba_unmultiplied(tc.r(), tc.g(), tc.b(), if dark { 42 } else { 52 });
+                                let fg = if dark { tc.lerp_to_gamma(Color32::WHITE, 0.3) } else { tc.lerp_to_gamma(Color32::BLACK, 0.3) };
+                                pnt.rect_filled(tile, 8.0, if on { acc } else { soft });
+                                pnt.text(tile.center(), Align2::CENTER_CENTER, icon, FontId::proportional(15.0), if on { on_accent(acc) } else { fg });
+                            }
+                            // à droite : « Entrée » sur la ligne choisie, sinon le raccourci éventuel
+                            let right = if on {
+                                kbd_chip(ui, row.right_center() - vec2(10.0, 0.0), &format!("{}  {}", icons::CORNER, tr("Entrée"))).min.x
+                            } else if !hint.is_empty() {
+                                kbd_chip(ui, row.right_center() - vec2(10.0, 0.0), &hint).min.x
+                            } else {
+                                row.max.x
+                            };
+                            let font = if on { FontId::new(15.0, egui::FontFamily::Name("bold".into())) } else { FontId::proportional(15.0) };
+                            let mut job = egui::text::LayoutJob::simple_singleline(label, font, v.text_color());
+                            job.wrap = egui::text::TextWrapping { max_width: (right - tile.max.x - 24.0).max(40.0), max_rows: 1, break_anywhere: true, overflow_character: Some('…') };
+                            let gal = ui.painter().layout_job(job);
+                            ui.painter().galley(pos2(tile.max.x + 12.0, row.center().y - gal.size().y / 2.0), gal, v.text_color());
+                            if resp.hovered() && ui.input(|i| i.pointer.is_moving()) {
+                                if let Some(p) = self.cmd.as_mut() {
+                                    p.sel = n;
+                                }
+                            }
+                            if resp.clicked() {
+                                chosen = Some(c);
                             }
                         }
-                        if resp.clicked() {
-                            chosen = Some(c);
-                        }
+                        ui.add_space(4.0);
+                    });
+                    // pied : les touches utiles
+                    let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 9.0), Sense::hover());
+                    ui.painter().hline(line.x_range(), line.center().y, Stroke::new(1.0_f32, v.widgets.noninteractive.bg_stroke.color));
+                    let (foot, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
+                    let mut x = foot.min.x + 10.0;
+                    for (key, what) in [(icons::ARROW_UP_DOWN, tr("choisir")), (icons::CORNER, tr("valider")), (tr("Échap"), tr("fermer"))] {
+                        let r = chip_from_left(ui, pos2(x, foot.center().y), key);
+                        let t = ui.painter().text(pos2(r.max.x + 7.0, foot.center().y), Align2::LEFT_CENTER, what, FontId::proportional(12.5), weak);
+                        x = t.max.x + 18.0;
                     }
                 });
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    ui.add_space(6.0);
-                    ui.weak(format!("{}  {}    {}  {}    {}  {}", icons::ARROW_UP_DOWN, tr("choisir"), icons::CORNER, tr("valider"), tr("Échap"), tr("fermer")));
-                });
-            });
         });
         if close {
             self.cmd = None;

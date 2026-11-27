@@ -150,30 +150,72 @@ impl App {
 
     pub(super) fn compare_ui(&mut self, ui: &mut egui::Ui) {
         let mut close = ui.input(|i| i.key_pressed(Key::Escape));
-        ui.horizontal(|ui| {
-            if ui.button(ic(icons::BACK, tr("← Retour").trim_start_matches("← "))).clicked() {
-                close = true;
-            }
-            if let Some(c) = &self.compare {
-                ui.weak(trf("A (gauche) : {0}   ·   B (droite) : {1}   ·   glisse pour comparer", &[&c.na, &c.nb]));
-            }
+        let mut swap = false;
+        contained(ui, |ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            split_row(
+                ui,
+                "compare_bar",
+                |ui| {
+                    if ghost(ui, icons::BACK, tr("← Retour").trim_start_matches("← ")).on_hover_text(tr("Retour à la galerie (Échap)")).clicked() {
+                        close = true;
+                    }
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 1.0;
+                        ui.label(bold_text(tr("Comparaison"), 15.0));
+                        ui.label(egui::RichText::new(tr("Glisse sur l'image pour déplacer la séparation")).size(12.5).color(ui.visuals().weak_text_color()));
+                    });
+                },
+                |ui| {
+                    if pill(ui, icons::COMPARE, tr("Inverser A et B")).clicked() {
+                        swap = true;
+                    }
+                },
+            );
         });
         if let Some(c) = &mut self.compare {
-            let (rect, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+            if swap {
+                std::mem::swap(&mut c.a, &mut c.b);
+                std::mem::swap(&mut c.na, &mut c.nb);
+            }
+            let (area, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+            let v = ui.visuals().clone();
+            ui.painter().rect_filled(area, 14.0, v.extreme_bg_color);
+            let rect = area.shrink(12.0);
             let s = c.a.size_vec2();
             let k = (rect.width() / s.x).min(rect.height() / s.y);
             let ir = Rect::from_center_size(rect.center(), s * k);
+            if resp.hovered() || resp.dragged() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+            }
             if let Some(pos) = resp.interact_pointer_pos() {
                 if resp.dragged() || resp.clicked() {
                     c.split = ((pos.x - ir.min.x) / ir.width()).clamp(0.0, 1.0);
                 }
             }
-            let p = ui.painter_at(rect);
+            let p = ui.painter_at(area);
             p.image(c.a.id(), ir, uv(), Color32::WHITE);
             let x = ir.min.x + ir.width() * c.split;
             let right = Rect::from_min_max(pos2(x, ir.min.y), ir.max);
             p.image(c.b.id(), right, Rect::from_min_max(pos2(c.split, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
+            // séparation : un trait blanc ombré et une poignée ronde au milieu
+            p.line_segment([pos2(x, ir.min.y), pos2(x, ir.max.y)], Stroke::new(4.0_f32, Color32::from_black_alpha(70)));
             p.line_segment([pos2(x, ir.min.y), pos2(x, ir.max.y)], Stroke::new(2.0_f32, Color32::WHITE));
+            let knob = Rect::from_center_size(pos2(x, ir.center().y), vec2(36.0, 36.0));
+            let shadow = egui::epaint::Shadow { offset: vec2(0.0, 3.0), blur: 12.0, spread: 0.0, color: Color32::from_black_alpha(100) };
+            p.add(shadow.as_shape(knob, 18.0));
+            p.rect_filled(knob, 18.0, Color32::WHITE);
+            let dark = Color32::from_gray(40);
+            let st = Stroke::new(1.8_f32, dark);
+            let c0 = knob.center();
+            p.line_segment([c0 + vec2(-4.0, -5.0), c0 + vec2(-9.0, 0.0)], st);
+            p.line_segment([c0 + vec2(-9.0, 0.0), c0 + vec2(-4.0, 5.0)], st);
+            p.line_segment([c0 + vec2(4.0, -5.0), c0 + vec2(9.0, 0.0)], st);
+            p.line_segment([c0 + vec2(9.0, 0.0), c0 + vec2(4.0, 5.0)], st);
+            // étiquettes A et B dans les coins de l'image
+            let max_w = (ir.width() / 2.0 - 24.0).max(60.0);
+            corner_tag(&p, pos2(ir.min.x + 10.0, ir.min.y + 10.0), false, "A", &c.na, max_w);
+            corner_tag(&p, pos2(ir.max.x - 10.0, ir.min.y + 10.0), true, "B", &c.nb, max_w);
         }
         if close {
             self.compare = None;
@@ -194,107 +236,125 @@ impl App {
         let handle = self.full.as_ref().map(|f| f.1.clone());
         let fav = self.favs.contains(&path);
         let (mut del, mut step, mut tfav, mut edit, mut ren, mut cpath) = (false, 0i32, false, false, false, false);
-        let (mut annotate, mut pin, mut cfile) = (false, false, false);
+        let (mut annotate, mut pin, mut cfile, mut back, mut copy) = (false, false, false, false, false);
+        let (mut open_ext, mut show_dir, mut toggle_show, mut toggle_full) = (false, false, false, false);
+        let mut new_first = self.slide_new_first;
+        let slideshow = self.slideshow;
 
-        let acc = self.shown_acc;
         let danger = col(239, 68, 68);
-        if !self.fullscreen {
-        ui.horizontal_wrapped(|ui| {
-            if ui.button(ic(icons::BACK, tr("← Retour").trim_start_matches("← "))).clicked() {
-                self.view = None;
-            }
-            if ui.add(egui::Button::new(icons::PREV).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Précédente (←)")).clicked() {
-                step = -1;
-            }
-            if ui.add(egui::Button::new(icons::NEXT).min_size(vec2(34.0, 30.0))).on_hover_text(tr("Suivante (→)")).clicked() {
-                step = 1;
-            }
-            ui.separator();
-            if ui.button(ic(icons::COPY, tr("Copier"))).on_hover_text(tr("Copier l'image dans le presse-papiers")).clicked() {
-                if let Ok(i) = image::open(&path) {
-                    copy_to_clipboard(&i.to_rgba8());
-                    self.status = ic(icons::COPY, tr("Image copiée dans le presse-papiers"));
-                }
-            }
-            let annot = egui::Button::new(egui::RichText::new(ic(icons::ANNOTATE, tr("Annoter"))).color(on_accent(acc))).fill(acc);
-            if ui.add(annot).on_hover_text(tr("Ouvrir l'éditeur d'annotations")).clicked() {
-                annotate = true;
-            }
-            let star = if fav {
-                egui::RichText::new(tr("★ Favori")).color(Color32::GOLD)
-            } else {
-                egui::RichText::new(tr("Favori"))
-            };
-            if ui.add(egui::Button::new(star)).on_hover_text(tr("Favori (F)")).clicked() {
-                tfav = true;
-            }
-            let trash = egui::Button::new(egui::RichText::new(ic(icons::TRASH, tr("Corbeille"))).color(danger));
-            if ui.add(trash).on_hover_text(tr("Mettre à la corbeille (Suppr)")).clicked() {
-                del = true;
-            }
-            dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
-                if ui.button(ic(icons::RENAME, tr("Renommer"))).clicked() {
-                    ren = true;
-                    ui.close_menu();
-                }
-                if ui.button(ic(icons::PIN, tr("Épingler à l'écran"))).clicked() {
-                    pin = true;
-                    ui.close_menu();
-                }
-                if ui.button(ic(icons::EDIT_EXT, tr("Modifier dans l'éditeur externe"))).clicked() {
-                    edit = true;
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui.button(ic(icons::EXTERNAL, tr("Ouvrir avec l'application par défaut"))).clicked() {
-                    let _ = Command::new("explorer").arg(&path).spawn();
-                    ui.close_menu();
-                }
-                if ui.button(ic(icons::FOLDER_OPEN, tr("Afficher dans le dossier"))).clicked() {
-                    let _ = Command::new("explorer").arg("/select,").arg(&path).spawn();
-                    ui.close_menu();
-                }
-                if ui.button(ic(icons::FOLDER, tr("Copier le fichier"))).clicked() {
-                    cfile = true;
-                    ui.close_menu();
-                }
-                if ui.button(ic(icons::LINK, tr("Copier le chemin"))).clicked() {
-                    cpath = true;
-                    ui.close_menu();
-                }
-                ui.separator();
-                let ss = egui::Button::new(if self.slideshow { ic(icons::PAUSE, tr("Arrêter le diaporama")) } else { ic(icons::PLAY, tr("Diaporama")) })
-                    .shortcut_text(tr("Espace"));
-                if ui.add(ss).clicked() {
-                    self.slideshow = !self.slideshow;
-                    self.slide_at = Instant::now();
-                    if self.slideshow {
-                        self.status = ic(icons::PLAY, &trf("Diaporama : {0}", &[&self.slide_label()]));
-                    }
-                    ui.close_menu();
-                }
-                ui.weak(tr("Ordre du diaporama"));
-                if ui.radio(!self.slide_new_first, tr("Du plus ancien au plus récent")).clicked() {
-                    self.slide_new_first = false;
-                }
-                if ui.radio(self.slide_new_first, tr("Du plus récent au plus ancien")).clicked() {
-                    self.slide_new_first = true;
-                }
-                if ui.add(egui::Button::new(ic(icons::FULLSCREEN, tr("Plein écran"))).shortcut_text("F11")).clicked() {
-                    self.fullscreen = !self.fullscreen;
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Fullscreen(self.fullscreen));
-                    ui.close_menu();
-                }
-            });
-        });
-        }
+        let gold = col(251, 191, 36);
         let dims = handle.as_ref().map(|t| format!("{}×{}", t.size()[0], t.size()[1])).unwrap_or_default();
-        let when_fmt = format!("{} %H:%M:%S", dfmt(true));
-        let when = chrono::DateTime::<chrono::Local>::from(modified).format(&when_fmt);
+        let when_fmt = format!("{} %H:%M", dfmt(true));
+        let when = chrono::DateTime::<chrono::Local>::from(modified).format(&when_fmt).to_string();
         if !self.fullscreen {
-            ui.weak(format!("{}  ·  {dims}  ·  {}  ·  {when}  ·  {}/{}", file_name(&path), human(size), pos + 1, vis.len()));
+            // barre du haut : retour et nom de la capture à gauche ; actions calées à droite
+            let name = file_name(&path);
+            let short: String = if name.chars().count() > 46 { name.chars().take(44).collect::<String>() + "…" } else { name.clone() };
+            let details = format!("{dims}  ·  {}  ·  {when}  ·  {}/{}", human(size), pos + 1, vis.len());
+            contained(ui, |ui| {
+                ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+                split_row(
+                    ui,
+                    "viewer_bar",
+                    |ui| {
+                        if ghost(ui, icons::BACK, tr("← Retour").trim_start_matches("← ")).on_hover_text(tr("Retour à la galerie (Échap)")).clicked() {
+                            back = true;
+                        }
+                        ui.vertical(|ui| {
+                            ui.spacing_mut().item_spacing.y = 1.0;
+                            ui.label(bold_text(&short, 15.0)).on_hover_text(&name);
+                            ui.label(egui::RichText::new(&details).size(12.5).color(ui.visuals().weak_text_color()));
+                        });
+                    },
+                    |ui| {
+                        if pill(ui, icons::COPY, tr("Copier")).on_hover_text(tr("Copier l'image dans le presse-papiers")).clicked() {
+                            copy = true;
+                        }
+                        if accent_pill(ui, icons::ANNOTATE, tr("Annoter")).on_hover_text(tr("Ouvrir l'éditeur d'annotations")).clicked() {
+                            annotate = true;
+                        }
+                        let (fav_tip, fav_col) = if fav { (tr("Retirer des favoris (F)"), gold) } else { (tr("Ajouter aux favoris (F)"), ui.visuals().text_color()) };
+                        if tinted_pill(ui, icons::STAR, tr("Favori"), fav_col).on_hover_text(fav_tip).clicked() {
+                            tfav = true;
+                        }
+                        if tinted_pill(ui, icons::TRASH, tr("Corbeille"), danger).on_hover_text(tr("Mettre à la corbeille (Suppr)")).clicked() {
+                            del = true;
+                        }
+                        dropdown(ui, &ic(icons::MORE, tr("Plus…")), false, |ui| {
+                            ui.set_min_width(250.0);
+                            if ui.button(ic(icons::RENAME, tr("Renommer"))).clicked() {
+                                ren = true;
+                                ui.close_menu();
+                            }
+                            if ui.button(ic(icons::PIN, tr("Épingler à l'écran"))).clicked() {
+                                pin = true;
+                                ui.close_menu();
+                            }
+                            if ui.button(ic(icons::EDIT_EXT, tr("Modifier dans l'éditeur externe"))).clicked() {
+                                edit = true;
+                                ui.close_menu();
+                            }
+                            ui.separator();
+                            if ui.button(ic(icons::EXTERNAL, tr("Ouvrir avec l'application par défaut"))).clicked() {
+                                open_ext = true;
+                                ui.close_menu();
+                            }
+                            if ui.button(ic(icons::FOLDER_OPEN, tr("Afficher dans le dossier"))).clicked() {
+                                show_dir = true;
+                                ui.close_menu();
+                            }
+                            if ui.button(ic(icons::FOLDER, tr("Copier le fichier"))).clicked() {
+                                cfile = true;
+                                ui.close_menu();
+                            }
+                            if ui.button(ic(icons::LINK, tr("Copier le chemin"))).clicked() {
+                                cpath = true;
+                                ui.close_menu();
+                            }
+                            ui.separator();
+                            let ss = egui::Button::new(if slideshow { ic(icons::PAUSE, tr("Arrêter le diaporama")) } else { ic(icons::PLAY, tr("Diaporama")) })
+                                .shortcut_text(tr("Espace"));
+                            if ui.add(ss).clicked() {
+                                toggle_show = true;
+                                ui.close_menu();
+                            }
+                            ui.label(egui::RichText::new(tr("Ordre du diaporama")).size(12.5).color(ui.visuals().weak_text_color()));
+                            if ui.radio(!new_first, tr("Du plus ancien au plus récent")).clicked() {
+                                new_first = false;
+                            }
+                            if ui.radio(new_first, tr("Du plus récent au plus ancien")).clicked() {
+                                new_first = true;
+                            }
+                            ui.separator();
+                            if ui.add(egui::Button::new(ic(icons::FULLSCREEN, tr("Plein écran"))).shortcut_text("F11")).clicked() {
+                                toggle_full = true;
+                                ui.close_menu();
+                            }
+                        });
+                    },
+                );
+            });
         }
-
+        self.slide_new_first = new_first;
+        if back {
+            self.view = None;
+            return;
+        }
+        if copy {
+            if let Ok(i) = image::open(&path) {
+                copy_to_clipboard(&i.to_rgba8());
+                self.status = ic(icons::COPY, tr("Image copiée dans le presse-papiers"));
+            }
+        }
+        if open_ext {
+            let _ = Command::new("explorer").arg(&path).spawn();
+        }
+        if show_dir {
+            let _ = Command::new("explorer").arg("/select,").arg(&path).spawn();
+        }
+        if toggle_full {
+            self.toggle_fullscreen(ctx);
+        }
         if pin {
             let s = path.display().to_string();
             let _ = spawn_self(&["--pin", s.as_str()]);
@@ -317,22 +377,34 @@ impl App {
         if ren {
             let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
             self.rename = Some((path.clone(), stem));
+            self.rename_focus = true;
         }
         if self.rename.as_ref().map(|r| r.0 != path).unwrap_or(false) {
             self.rename = None;
         }
+        // renommage : un champ sous la barre (Entrée pour valider)
         let (mut do_rename, mut cancel) = (None::<String>, false);
-        if let Some((_, buf)) = &mut self.rename {
-            ui.horizontal(|ui| {
-                ui.label(tr("Nouveau nom :"));
-                ui.add(egui::TextEdit::singleline(buf).desired_width(320.0));
-                if ui.button(tr("Valider")).clicked() {
-                    do_rename = Some(buf.clone());
-                }
-                if ui.button(tr("Annuler")).clicked() {
-                    cancel = true;
-                }
+        if self.rename.is_some() {
+            let focus = std::mem::take(&mut self.rename_focus);
+            let buf = &mut self.rename.as_mut().unwrap().1;
+            contained(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    ui.label(egui::RichText::new(tr("Nouveau nom :")).color(ui.visuals().weak_text_color()));
+                    let r = field(ui, buf, "", 320.0);
+                    if focus {
+                        r.request_focus();
+                    }
+                    let enter = r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
+                    if accent_pill(ui, icons::RENAME, tr("Renommer")).clicked() || enter {
+                        do_rename = Some(buf.clone());
+                    }
+                    if ghost(ui, "", tr("Annuler")).clicked() {
+                        cancel = true;
+                    }
+                });
             });
+            ui.add_space(4.0);
         }
         if cancel {
             self.rename = None;
@@ -376,7 +448,7 @@ impl App {
         if k.4 {
             tfav = true;
         }
-        if k.6 {
+        if k.6 || toggle_show {
             self.slideshow = !self.slideshow;
             self.slide_at = Instant::now();
             if self.slideshow && !self.fullscreen {
@@ -384,7 +456,7 @@ impl App {
             }
         }
         if self.slideshow {
-            ctx.request_repaint_after(Duration::from_millis(500));
+            ctx.request_repaint_after(Duration::from_millis(100));
             if self.slide_at.elapsed() >= Duration::from_secs(3) {
                 self.slide_at = Instant::now();
                 self.view = Some(self.slide_next(vis, v));
@@ -411,11 +483,16 @@ impl App {
         }
 
         if let Some(t) = handle {
+            // l'image est posée dans un panneau en retrait (sauf en plein écran, sur fond noir)
             // zoom : molette vers le curseur, glisser pour déplacer, double-clic, + − 0 1 ; barre flottante en bas
             let s = t.size_vec2();
             let (area, resp) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
+            if !self.fullscreen {
+                ui.painter().rect_filled(area, 14.0, ui.visuals().extreme_bg_color);
+            }
+            let inner = if self.fullscreen { area } else { area.shrink(12.0) };
             let keys = !ctx.wants_keyboard_input() && self.rename.is_none();
-            let r = self.zoom.update(ui, &resp, area, s, crate::zoom::Pan::Primary, keys, true);
+            let r = self.zoom.update(ui, &resp, inner, s, crate::zoom::Pan::Primary, keys, true);
             self.view_rect = Some(r);
             // ouverture depuis la grille : l'image vole depuis sa miniature (dessinée par-dessus, voir `Fly`)
             if let Some(from) = self.fly_from.take() {
@@ -440,9 +517,92 @@ impl App {
             if !flying {
                 ui.painter_at(area).image(t.id(), shown, uv(), Color32::from_white_alpha((k * 255.0) as u8));
             }
+
+            // précédente / suivante : boutons ronds sur les côtés, visibles quand la souris est sur l'image
+            let near = ui.rect_contains_pointer(area);
+            let nk = ctx.animate_bool_with_time(egui::Id::new("viewer_nav"), near, 0.2);
+            let mut go: Option<i32> = None;
+            if nk > 0.01 {
+                for (d, icon, ok, x, tip) in [
+                    (-1, icons::PREV, pos > 0, area.min.x + 36.0, tr("Précédente (←)")),
+                    (1, icons::NEXT, pos + 1 < vis.len(), area.max.x - 36.0, tr("Suivante (→)")),
+                ] {
+                    if ok && nav_button(ui, egui::Id::new(("viewer_nav", d)), pos2(x, area.center().y), icon, nk).on_hover_text(tip).clicked() {
+                        go = Some(d);
+                    }
+                }
+            }
+            // diaporama en cours : petite pilule en haut, avec le temps restant avant l'image suivante
+            if self.slideshow {
+                let frac = (self.slide_at.elapsed().as_secs_f32() / 3.0).min(1.0);
+                if slide_pill(ui, area, frac).clicked() {
+                    self.slideshow = false;
+                }
+            }
             self.zoom.controls(ui, area, tr("Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle"));
+            if let Some(d) = go {
+                let n = pos as i32 + d;
+                if n >= 0 && (n as usize) < vis.len() {
+                    self.view = Some(vis[n as usize]);
+                    self.view_dir = d as f32;
+                    ctx.request_repaint();
+                }
+            }
         }
     }
+}
+
+/// Étiquette « A · nom » posée dans un coin de l'image du comparateur (`right` : calée à droite de `at`).
+fn corner_tag(p: &egui::Painter, at: Pos2, right: bool, letter: &str, name: &str, max_w: f32) {
+    let name_g = fit_galley(p, name, FontId::proportional(12.5), Color32::WHITE, max_w - 40.0);
+    let size = vec2(name_g.size().x + 44.0, 28.0);
+    let r = if right { Rect::from_min_size(pos2(at.x - size.x, at.y), size) } else { Rect::from_min_size(at, size) };
+    p.rect_filled(r, 14.0, Color32::from_black_alpha(170));
+    let badge = Rect::from_center_size(pos2(r.min.x + 15.0, r.center().y), vec2(20.0, 20.0));
+    p.rect_filled(badge, 10.0, Color32::WHITE);
+    p.text(badge.center(), Align2::CENTER_CENTER, letter, bold(12.0), Color32::from_gray(30));
+    p.galley(pos2(badge.max.x + 8.0, r.center().y - name_g.size().y / 2.0), name_g, Color32::WHITE);
+}
+
+/// Bouton rond flottant (précédente / suivante de la visionneuse), qui apparaît en fondu (`k`).
+fn nav_button(ui: &mut egui::Ui, id: egui::Id, center: Pos2, icon: &str, k: f32) -> egui::Response {
+    let r = Rect::from_center_size(center, vec2(46.0, 46.0));
+    let resp = ui.interact(r, id, Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let hk = ui.ctx().animate_bool_with_time(id.with("hov"), resp.hovered(), anim::HOVER);
+    let v = ui.visuals();
+    let mut p = ui.painter().clone();
+    p.multiply_opacity(k);
+    let r = r.expand(2.0 * hk);
+    let shadow = egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 16.0, spread: 0.0, color: Color32::from_black_alpha(90) };
+    p.add(shadow.as_shape(r, r.height() / 2.0));
+    p.rect_filled(r, r.height() / 2.0, v.window_fill.lerp_to_gamma(v.widgets.hovered.weak_bg_fill, hk).gamma_multiply(0.96));
+    p.text(r.center(), Align2::CENTER_CENTER, icon, FontId::proportional(20.0), v.text_color());
+    resp
+}
+
+/// Pilule « Diaporama » en haut de l'image : barre de progression jusqu'à l'image suivante ; un clic l'arrête.
+fn slide_pill(ui: &mut egui::Ui, area: Rect, frac: f32) -> egui::Response {
+    let v = ui.visuals().clone();
+    let label = ic(icons::PAUSE, tr("Diaporama · clic ou Espace : arrêter"));
+    let g = ui.painter().layout_no_wrap(label, FontId::proportional(13.0), v.text_color());
+    let size = vec2(g.size().x + 32.0, 34.0);
+    let r = Rect::from_center_size(pos2(area.center().x, area.min.y + 18.0 + size.y / 2.0), size);
+    let resp = ui.interact(r, egui::Id::new("slide_pill"), Sense::click());
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let p = ui.painter_at(area);
+    let shadow = egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 16.0, spread: 0.0, color: Color32::from_black_alpha(90) };
+    p.add(shadow.as_shape(r, 17.0));
+    p.rect_filled(r, 17.0, v.window_fill.gamma_multiply(0.96));
+    p.galley(pos2(r.min.x + 16.0, r.center().y - g.size().y / 2.0 - 2.0), g, v.text_color());
+    let track = Rect::from_min_size(pos2(r.min.x + 16.0, r.max.y - 7.0), vec2(r.width() - 32.0, 3.0));
+    p.rect_filled(track, 1.5, v.widgets.inactive.weak_bg_fill);
+    p.rect_filled(Rect::from_min_size(track.min, vec2(track.width() * frac, 3.0)), 1.5, accent_of(&v));
+    resp
 }
 
 /// Tuile de statistique : icône et nom en haut, chiffre en grand en bas à droite. Elle monte en fondu.
