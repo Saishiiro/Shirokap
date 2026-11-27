@@ -482,7 +482,8 @@ pub(crate) fn fav_chip(ui: &mut egui::Ui, on: bool, label: &str) -> egui::Respon
 
 /// Deux groupes sur une même ligne : `left` à gauche, `right` calé au bord droit. Si la place manque,
 /// `right` passe sur la ligne suivante. Les largeurs naturelles sont mesurées quand tout tient sur une ligne.
-pub(crate) fn split_row(ui: &mut egui::Ui, salt: &str, left: impl FnOnce(&mut egui::Ui), right: impl FnOnce(&mut egui::Ui)) {
+/// Renvoie la place des deux groupes quand ils tiennent sur une seule ligne.
+pub(crate) fn split_row(ui: &mut egui::Ui, salt: &str, left: impl FnOnce(&mut egui::Ui), right: impl FnOnce(&mut egui::Ui)) -> Option<(Rect, Rect)> {
     let id = ui.id().with(("split_row", salt));
     let (lw, rw) = ui.ctx().data(|d| d.get_temp::<(f32, f32)>(id)).unwrap_or((0.0, 0.0));
     let avail = ui.available_width();
@@ -490,20 +491,22 @@ pub(crate) fn split_row(ui: &mut egui::Ui, salt: &str, left: impl FnOnce(&mut eg
     if lw + rw + gap <= avail {
         let (l, r) = ui
             .horizontal(|ui| {
-                let l = ui.horizontal(left).response.rect.width();
+                let l = ui.horizontal(left).response.rect;
                 let sp = ui.spacing().item_spacing.x;
-                ui.add_space((avail - l - rw - 2.0 * sp).max(gap - sp));
-                let r = ui.horizontal(right).response.rect.width();
+                ui.add_space((avail - l.width() - rw - 2.0 * sp).max(gap - sp));
+                let r = ui.horizontal(right).response.rect;
                 (l, r)
             })
             .inner;
-        if (l - lw).abs() > 0.5 || (r - rw).abs() > 0.5 {
-            ui.ctx().data_mut(|d| d.insert_temp(id, (l, r)));
+        if (l.width() - lw).abs() > 0.5 || (r.width() - rw).abs() > 0.5 {
+            ui.ctx().data_mut(|d| d.insert_temp(id, (l.width(), r.width())));
             ui.ctx().request_repaint();
         }
+        Some((l, r))
     } else {
         // deux lignes (les largeurs mémorisées restent celles de la ligne unique)
         ui.horizontal_wrapped(left);
         ui.horizontal_wrapped(right);
+        None
     }
 }

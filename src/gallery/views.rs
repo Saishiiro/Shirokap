@@ -246,12 +246,13 @@ impl App {
         let dims = handle.as_ref().map(|t| format!("{}×{}", t.size()[0], t.size()[1])).unwrap_or_default();
         let when_fmt = format!("{} %H:%M", dfmt(true));
         let when = chrono::DateTime::<chrono::Local>::from(modified).format(&when_fmt).to_string();
+        let mut bar_gap: Option<Rect> = None;
         if !self.fullscreen {
             // barre du haut : retour et nom de la capture à gauche ; actions calées à droite
             let name = file_name(&path);
             let short: String = if name.chars().count() > 46 { name.chars().take(44).collect::<String>() + "…" } else { name.clone() };
             let details = format!("{dims}  ·  {}  ·  {when}  ·  {}/{}", human(size), pos + 1, vis.len());
-            contained(ui, |ui| {
+            let groups = contained(ui, |ui| {
                 ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
                 split_row(
                     ui,
@@ -310,8 +311,10 @@ impl App {
                             item(ui, icons::FULLSCREEN, tr("Plein écran"), "F11", &mut toggle_full);
                         });
                     },
-                );
+                )
             });
+            // place libre entre le nom et les boutons : la pilule du diaporama s'y loge
+            bar_gap = groups.map(|(l, r)| Rect::from_min_max(pos2(l.max.x + 16.0, l.min.y), pos2(r.min.x - 16.0, r.max.y)));
         }
         self.slide_new_first = new_first;
         if back {
@@ -437,7 +440,8 @@ impl App {
         if self.slideshow {
             // la barre de progression a besoin d'images régulières ; cachée, on attend juste l'image suivante
             let left = Duration::from_secs(self.cfg.slide_secs.max(1) as u64).saturating_sub(self.slide_at.elapsed());
-            ctx.request_repaint_after(if self.zoom.awake(ui) { Duration::from_millis(100) } else { left });
+            let shown = !self.fullscreen || self.zoom.awake(ui);
+            ctx.request_repaint_after(if shown { Duration::from_millis(100) } else { left });
             if self.slide_at.elapsed() >= Duration::from_secs(self.cfg.slide_secs.max(1) as u64) {
                 self.slide_at = Instant::now();
                 self.view = Some(self.slide_next(vis, v));
@@ -513,12 +517,32 @@ impl App {
                     }
                 }
             }
-            // diaporama en cours : petite pilule en haut, avec le temps restant avant l'image suivante
+            // diaporama en cours : petite pilule avec le temps restant avant l'image suivante, au centre de la
+            // barre du haut ; en plein écran (ou si la barre est trop étroite), elle flotte en haut de l'image
+            // et, comme la barre de zoom, ne se montre que quand la souris bouge
             if self.slideshow {
                 let frac = (self.slide_at.elapsed().as_secs_f32() / self.cfg.slide_secs.max(1) as f32).min(1.0);
-                if slide_pill(ui, area, frac, &mut self.zoom).clicked() {
+                let size = slide_pill_size(ui);
+                let clicked = match bar_gap.filter(|g| g.width() >= size.x) {
+                    Some(g) => {
+                        let k = ctx.animate_bool_with_time(egui::Id::new("slide_pill_bar"), true, 0.25);
+                        slide_pill(ui, g.center(), frac, k, ui.clip_rect()).clicked()
+                    }
+                    None => {
+                        let home = Rect::from_center_size(pos2(area.center().x, area.min.y + 18.0 + size.y / 2.0), size);
+                        if ui.rect_contains_pointer(home.expand(12.0)) {
+                            self.zoom.wake(ui); // tant que la souris est dessus, elle reste là
+                        }
+                        let k = ctx.animate_bool_with_time_and_easing(egui::Id::new("slide_pill_k"), self.zoom.awake(ui), 0.3, egui::emath::easing::cubic_out);
+                        // elle remonte en s'effaçant (la barre de zoom, elle, descend)
+                        k > 0.02 && slide_pill(ui, home.center() - vec2(0.0, 12.0 * (1.0 - k)), frac, k, area).clicked()
+                    }
+                };
+                if clicked {
                     self.slideshow = false;
                 }
+            } else {
+                ctx.animate_bool_with_time(egui::Id::new("slide_pill_bar"), false, 0.0);
             }
             self.zoom.controls(ui, area, tr("Molette : zoom · glisser : déplacer · double-clic : ajuster / taille réelle"));
             if let Some(d) = go {
@@ -564,28 +588,26 @@ fn nav_button(ui: &mut egui::Ui, id: egui::Id, center: Pos2, icon: &str, k: f32)
     resp
 }
 
-/// Pilule « Diaporama » en haut de l'image : barre de progression jusqu'à l'image suivante ; un clic l'arrête.
-/// Comme la barre de zoom, elle n'apparaît que quand la souris bouge, puis s'efface.
-fn slide_pill(ui: &mut egui::Ui, area: Rect, frac: f32, zoom: &mut crate::zoom::Zoom) -> egui::Response {
+fn slide_pill_label() -> String {
+    ic(icons::PAUSE, tr("Diaporama · clic ou Espace : arrêter"))
+}
+
+fn slide_pill_size(ui: &egui::Ui) -> Vec2 {
+    let g = ui.painter().layout_no_wrap(slide_pill_label(), FontId::proportional(13.0), Color32::PLACEHOLDER);
+    vec2(g.size().x + 32.0, 34.0)
+}
+
+/// Pilule « Diaporama » centrée sur `center` : barre de progression jusqu'à l'image suivante ; un clic
+/// l'arrête. `k` : apparition (opacité), `clip` : zone où elle peut être dessinée.
+fn slide_pill(ui: &mut egui::Ui, center: Pos2, frac: f32, k: f32, clip: Rect) -> egui::Response {
     let v = ui.visuals().clone();
-    let label = ic(icons::PAUSE, tr("Diaporama · clic ou Espace : arrêter"));
-    let g = ui.painter().layout_no_wrap(label, FontId::proportional(13.0), v.text_color());
-    let size = vec2(g.size().x + 32.0, 34.0);
-    let r = Rect::from_center_size(pos2(area.center().x, area.min.y + 18.0 + size.y / 2.0), size);
-    if ui.rect_contains_pointer(r.expand(12.0)) {
-        zoom.wake(ui); // tant que la souris est dessus, elle reste là
-    }
-    let k = ui.ctx().animate_bool_with_time_and_easing(egui::Id::new("slide_pill_k"), zoom.awake(ui), 0.3, egui::emath::easing::cubic_out);
+    let g = ui.painter().layout_no_wrap(slide_pill_label(), FontId::proportional(13.0), v.text_color());
+    let r = Rect::from_center_size(center, slide_pill_size(ui));
     let resp = ui.interact(r, egui::Id::new("slide_pill"), if k > 0.5 { Sense::click() } else { Sense::hover() });
-    if k < 0.02 {
-        return resp;
-    }
     if resp.hovered() && k > 0.5 {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    // elle remonte en s'effaçant (la barre de zoom, elle, descend)
-    let r = r.translate(vec2(0.0, -12.0 * (1.0 - k)));
-    let mut p = ui.painter_at(area);
+    let mut p = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
     p.multiply_opacity(k);
     let shadow = egui::epaint::Shadow { offset: vec2(0.0, 4.0), blur: 16.0, spread: 0.0, color: Color32::from_black_alpha(90) };
     p.add(shadow.as_shape(r, 17.0));
