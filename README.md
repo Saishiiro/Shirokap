@@ -5,7 +5,7 @@
 # Shirokap
 
 **A lightweight screenshot tool for Windows, living in the system tray.**
-Global hotkeys · animated gallery · annotation editor · 17 themes · command palette · EN / FR / ES / DE / 中文
+Global hotkeys · animated gallery · annotation editor · 18 themes · command palette · EN / FR / ES / DE / 中文
 
 [![Release](https://img.shields.io/github/v/release/Saishiiro/Shirokap?style=flat-square)](../../releases/latest)
 [![GPL-3.0 License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](LICENSE)
@@ -42,15 +42,18 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 - Delay before capture, timelapse, blocklist of sensitive windows, automatic cleanup of old screenshots.
 
 **Gallery**
-- Grid of rounded thumbnails grouped by day, with search, sorting, favorites, multi-selection (with select all), quick access to the folder and drag and drop to import images.
-- Viewer with smooth zoom (wheel towards the cursor, drag, double-click, + − 0 1), slideshow, fullscreen; slider comparison, statistics.
+- Modern interface made of floating rounded panels, pill buttons with clear names, and a command bar at the top of every page.
+- Grid of rounded thumbnails grouped by day, with search, sorting, folder and favorite filters, multi-selection with a floating action bar, quick access to the folder and drag and drop to import images.
+- Viewer with smooth zoom (wheel towards the cursor, drag, double-click, + − 0 1), previous / next buttons, slideshow with adjustable time per image, fullscreen; slider comparison.
+- Statistics: totals, last 7 days, folders, an activity calendar with your streaks, and the hours you capture the most.
+- Notifications with an "Undo" button after moving to the Recycle Bin, renaming or resetting settings; a confirmation is asked before anything goes to the Recycle Bin.
 - Command palette (Ctrl+K): type a few letters to switch tab, theme, folder or sort, or to open a screenshot.
 - Smooth animations throughout: thumbnails that lift on hover, screenshots that fly from their thumbnail to the viewer, cascading thumbnails, sliding menus and notifications.
-- 17 themes with a circular reveal when switching, an accent color per theme ("Auto") or of your choice, Lucide icons, title bar matching the theme.
+- 18 themes (including Shirokap, in the colors of the logo) with a circular reveal when switching, an accent color per theme ("Auto") or of your choice, Lucide icons, title bar matching the theme. On first launch the theme follows Windows (light or dark).
 - Collapsible side menu (Ctrl+B) that shows icons when collapsed.
 
 **Annotation editor**
-- Pen, shapes (rectangle, ellipse, line, arrows…), highlighter, blur, text, numbered steps, eraser.
+- Pen, shapes (rectangle, ellipse, line, arrows…), highlighter, blur, text, numbered steps, eraser, from a toolbar where every tool is named.
 - Preview faithful to the final result, unlimited undo and redo, zoom (wheel, + − 0 1) and move (middle-click or Space + drag), save as a copy or replace the original.
 
 **Languages**
@@ -60,6 +63,7 @@ A lightweight screenshot tool for Windows, written in Rust. It runs quietly in t
 
 **Other**
 - Screenshot pinned on top of the screen, copy files to the clipboard, export the selection.
+- Tray menu with quick tiles (screen, region, gallery, color picker), switches for the quick settings and today's count.
 - Launch with Windows, export/import of the configuration.
 - Light on resources: the tray process and the gallery in the background ask Windows 11 to run them in its power-saving mode (EcoQoS). They keep their normal priority so that shortcuts stay instant, so Task Manager does not show its "Efficiency mode" leaf.
 
@@ -194,15 +198,18 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 - Délai avant capture, timelapse, liste noire de fenêtres sensibles, rangement automatique des vieilles captures.
 
 **Galerie**
-- Grille de miniatures arrondies, regroupées par jour, avec recherche, tri, favoris, sélection multiple (avec « Tout sélectionner »), accès direct au dossier et glisser-déposer pour importer des images.
-- Visionneuse avec zoom fluide (molette vers le curseur, glisser, double-clic, + − 0 1), diaporama, plein écran ; comparateur à curseur, statistiques.
+- Interface moderne en panneaux arrondis flottants, boutons en pilule avec des noms clairs, et barre de commandes en haut de chaque page.
+- Grille de miniatures arrondies, regroupées par jour, avec recherche, tri, filtres par dossier et favoris, sélection multiple avec une barre d'actions flottante, accès direct au dossier et glisser-déposer pour importer des images.
+- Visionneuse avec zoom fluide (molette vers le curseur, glisser, double-clic, + − 0 1), boutons précédente / suivante, diaporama à durée réglable, plein écran ; comparateur à curseur.
+- Statistiques : totaux, 7 derniers jours, dossiers, calendrier d'activité avec tes séries, et les heures où tu captures le plus.
+- Notifications avec un bouton « Annuler » après une mise à la corbeille, un renommage ou une réinitialisation des réglages ; une confirmation est demandée avant toute mise à la corbeille.
 - Palette de commandes (Ctrl+K) : quelques lettres pour changer d'onglet, de thème, de dossier ou de tri, ou pour ouvrir une capture.
 - Des animations partout : miniatures qui se soulèvent au survol, captures qui volent de leur miniature à la visionneuse, apparition en cascade, menus et notifications qui glissent.
-- 17 thèmes avec un cercle qui révèle le nouveau thème, une couleur d'accent par thème (« Auto ») ou au choix, icônes Lucide, barre de titre assortie au thème.
+- 18 thèmes (dont Shirokap, aux couleurs du logo) avec un cercle qui révèle le nouveau thème, une couleur d'accent par thème (« Auto ») ou au choix, icônes Lucide, barre de titre assortie au thème. Au premier lancement, le thème suit Windows (clair ou sombre).
 - Menu latéral réductible (Ctrl+B), avec des icônes une fois réduit.
 
 **Éditeur d'annotations**
-- Stylo, formes (rectangle, ellipse, ligne, flèches…), surligneur, flou, texte, étapes numérotées, gomme.
+- Stylo, formes (rectangle, ellipse, ligne, flèches…), surligneur, flou, texte, étapes numérotées, gomme, dans une barre d'outils où chaque outil porte son nom.
 - Aperçu fidèle au résultat final, annulation et rétablissement illimités, zoom (molette, + − 0 1) et déplacement (clic molette ou Espace + glisser), enregistrement en copie ou remplacement de l'original.
 
 **Langues**
@@ -212,6 +219,7 @@ Outil de capture d'écran léger pour Windows, écrit en Rust. Il tourne discrè
 
 **Autres**
 - Capture épinglée au premier plan de l'écran, copie des fichiers dans le presse-papiers, export de la sélection.
+- Menu du tray avec des tuiles rapides (écran, zone, galerie, pipette), des interrupteurs pour les réglages rapides et le nombre de captures du jour.
 - Lancement automatique avec Windows, export/import de la configuration.
 - Léger : le processus du tray et la galerie en arrière-plan demandent à Windows 11 de les faire tourner en mode économie d'énergie (EcoQoS). Ils gardent leur priorité normale pour que les raccourcis restent instantanés : le gestionnaire des tâches n'affiche donc pas sa feuille « Mode efficacité ».
 

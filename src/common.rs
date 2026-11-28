@@ -150,7 +150,7 @@ impl Default for Config {
             clipboard: false, // à activer dans les paramètres si on le souhaite
             sound: false,
             flash: true,
-            theme: "dark".into(),
+            theme: if windows_light_mode() { "light" } else { "dark" }.into(), // comme Windows
             accent: [59, 130, 246],
             accent_auto: true,
             tray_menu: "modern".into(),
@@ -447,6 +447,19 @@ pub fn list_items(root: &str) -> Vec<Item> {
 }
 
 // ---------- lancement au démarrage (registre) ----------
+/// Windows est-il réglé en mode clair pour les applications ? Le thème par défaut le suit
+/// (« Clair » ou « Sombre ») ; en cas de doute, sombre.
+pub fn windows_light_mode() -> bool {
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+    let key: Vec<u16> = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize".encode_utf16().chain([0]).collect();
+    let name: Vec<u16> = "AppsUseLightTheme".encode_utf16().chain([0]).collect();
+    let (mut data, mut size) = (0u32, 4u32);
+    let r = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), name.as_ptr(), RRF_RT_REG_DWORD, std::ptr::null_mut(), &mut data as *mut u32 as *mut _, &mut size)
+    };
+    r == 0 && data == 1
+}
+
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 
 fn hidden(cmd: &mut Command) -> bool {
