@@ -1,9 +1,16 @@
 name: Build
 
+# À chaque envoi : compile Shirokap pour Windows et garde les fichiers (onglet Actions > le build > Artifacts).
+# Sur un tag vX.Y.Z : prépare en plus un brouillon de release avec les 3 fichiers et leurs SHA-256,
+# à relire puis publier depuis l'onglet Releases.
+
 on:
   push:
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write # pour créer le brouillon de release
 
 jobs:
   windows:
@@ -12,20 +19,78 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Compile
-        run: cargo build --release
-      - name: Copy exe
-        run: copy target\release\shirokap.exe shirokap.exe
-      - name: Installer
-        shell: cmd
+
+      - name: Version
+        id: ver
+        shell: pwsh
         run: |
+          $ver = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          "version=$ver" >> $env:GITHUB_OUTPUT
+          if ($env:GITHUB_REF -like 'refs/tags/v*' -and $env:GITHUB_REF_NAME -ne "v$ver") {
+            Write-Error "Le tag $env:GITHUB_REF_NAME ne correspond pas à la version de Cargo.toml ($ver)"
+            exit 1
+          }
+
+      - name: Compile
+        shell: pwsh
+        run: |
+          # comme build.bat : les chemins de la machine de build ne restent pas écrits dans l'exe
+          $env:RUSTFLAGS = "--remap-path-prefix=$env:USERPROFILE=~ --remap-path-prefix=$env:GITHUB_WORKSPACE=shirokap"
+          cargo build --release
+
+      - name: Portable and installer
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item target\release\shirokap.exe "out\Shirokap-$ver-portable.exe"
+          Compress-Archive -Path "out\Shirokap-$ver-portable.exe" -DestinationPath "out\Shirokap-$ver-portable.zip"
           choco install innosetup -y --no-progress
-          for /f "tokens=3 delims= " %%v in ('findstr /b /c:"version = " Cargo.toml') do (set VER=%%~v& goto :found)
-          :found
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DMyAppVersion=%VER% installer\Shirokap.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$ver" installer\Shirokap.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item "dist\Shirokap-Setup-$ver.exe" out\
+
+      - name: SHA-256 and release notes
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          $sums = Get-ChildItem out -File | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          }
+          $sums | Set-Content -Encoding utf8 out\SHA256SUMS.txt
+          $notes = @(
+            "**What's new / Nouveautés**"
+            "- (to fill in / à compléter)"
+            ""
+            "**Download / Téléchargement**"
+            "- ``Shirokap-$ver-portable.zip`` / ``.exe``: portable, no installation (recommended) / portable, sans installation (conseillé)"
+            "- ``Shirokap-Setup-$ver.exe``: installer / installateur"
+            ""
+            "Windows 10/11 · The executables are not signed: SmartScreen or your browser may warn you, click ""More info"" > ""Run anyway"". The installer may be flagged by a few antivirus by mistake (false positive); the portable version is not. / Les exécutables ne sont pas signés : SmartScreen ou ton navigateur peut afficher un avertissement, clique sur « Informations complémentaires » > « Exécuter quand même ». L'installateur peut être signalé à tort par quelques antivirus (faux positif) ; la version portable ne l'est pas."
+            ""
+            "See the CHANGELOG for details. / Voir le CHANGELOG pour le détail."
+            ""
+            "**SHA-256**"
+            '```'
+          ) + ($sums | Where-Object { $_ -notmatch 'SHA256SUMS' }) + @('```')
+          $notes | Set-Content -Encoding utf8 release-notes.md
+          Get-Content out\SHA256SUMS.txt
+
       - uses: actions/upload-artifact@v4
         with:
-          name: Shirokap
+          name: Shirokap-${{ steps.ver.outputs.version }}
           path: |
-            shirokap.exe
-            dist/*.exe
+            out/*
+            release-notes.md
+
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Shirokap ${{ steps.ver.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            out/Shirokap-${{ steps.ver.outputs.version }}-portable.exe
+            out/Shirokap-${{ steps.ver.outputs.version }}-portable.zip
+            out/Shirokap-Setup-${{ steps.ver.outputs.version }}.exe
