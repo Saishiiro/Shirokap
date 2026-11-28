@@ -714,11 +714,11 @@ pub fn run() {
                 Some(3) => trigger(&cfg, Mode::LastZone, &tx, &mut pending),
                 Some(4) => open_gallery(&mut gallery, false),
                 Some(5) => open_region(&cfg, &mut region, true),
-                Some(6)
-                    if do_pick(&it) && cfg.flash => {
-                        let _ = tray.set_icon(Some(icon(GREEN)));
-                        flash_until = Some(now + Duration::from_millis(600));
-                    }
+                // pipette : la couleur est copiée par `do_pick`, l'icône clignote en vert si elle a marché
+                Some(6) if do_pick(&it) && cfg.flash => {
+                    let _ = tray.set_icon(Some(icon(GREEN)));
+                    flash_until = Some(now + Duration::from_millis(600));
+                }
                 _ => {}
             }
         }
