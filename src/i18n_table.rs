@@ -100,7 +100,7 @@ pub static TABLE: [[&str; 5]; 388] = [
     ["Capturer une zone", "Capture a region", "Capturar una zona", "Bereich aufnehmen", "截取区域"],
     ["Capturer la fenêtre active", "Capture the active window", "Capturar la ventana activa", "Aktives Fenster aufnehmen", "截取活动窗口"],
     ["Bienvenue dans Shirokap", "Welcome to Shirokap", "Bienvenido a Shirokap", "Willkommen bei Shirokap", "欢迎使用 Shirokap"],
-    ["Une capture d'écran légère, qui tourne discrètement dans la zone de notification.", "A lightweight screenshot tool that runs quietly in the notification area.", "Una herramienta de capturas ligera que funciona discretamente en el área de notificación.", "Ein leichtes Screenshot-Tool, das unauffällig im Infobereich läuft.", "一款轻量的截图工具，在通知区域静默运行。"],
+    ["Un outil de capture d'écran léger, qui tourne discrètement dans la zone de notification.", "A lightweight screenshot tool that runs quietly in the notification area.", "Una herramienta de capturas ligera que funciona discretamente en el área de notificación.", "Ein leichtes Screenshot-Tool, das unauffällig im Infobereich läuft.", "一款轻量的截图工具，在通知区域静默运行。"],
     ["Tes raccourcis", "Your shortcuts", "Tus atajos", "Deine Tastenkürzel", "你的快捷键"],
     ["Dans la zone de notification", "In the notification area", "En el área de notificación", "Im Infobereich", "在通知区域"],
     ["Tes captures", "Your screenshots", "Tus capturas", "Deine Aufnahmen", "你的截图"],

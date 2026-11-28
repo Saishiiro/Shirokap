@@ -111,7 +111,7 @@ impl App {
                 ui.spacing_mut().item_spacing.y = 2.0;
                 ui.add_space(2.0);
                 ui.label(bold_text(tr("Bienvenue dans Shirokap"), 24.0));
-                ui.label(egui::RichText::new(tr("Une capture d'écran légère, qui tourne discrètement dans la zone de notification.")).color(weak));
+                ui.label(egui::RichText::new(tr("Un outil de capture d'écran léger, qui tourne discrètement dans la zone de notification.")).color(weak));
             });
         });
         ui.add_space(14.0);
