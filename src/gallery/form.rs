@@ -342,9 +342,7 @@ pub(crate) fn normalize_hotkey(s: &str) -> String {
             };
             if !canon.is_empty() {
                 canon.to_string()
-            } else if l.len() > 1 && l.starts_with('f') && l[1..].parse::<u8>().is_ok() {
-                l.to_uppercase()
-            } else if l.chars().count() == 1 {
+            } else if (l.len() > 1 && l.starts_with('f') && l[1..].parse::<u8>().is_ok()) || l.chars().count() == 1 {
                 l.to_uppercase()
             } else {
                 p.to_string()

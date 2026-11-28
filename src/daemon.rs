@@ -554,7 +554,7 @@ pub fn run() {
     // ----- menu -----
     let mut cmds: HashMap<MenuId, Cmd> = HashMap::new();
     let res: Vec<(u32, CheckMenuItem)> =
-        RES.iter().map(|(w, label)| (*w, ck(&mut cmds, tr(*label), false, Cmd::Res(*w)))).collect();
+        RES.iter().map(|(w, label)| (*w, ck(&mut cmds, tr(label), false, Cmd::Res(*w)))).collect();
     let it = Items {
         header: MenuItem::new("Shirokap", false, None),
         today: MenuItem::new("", false, None),
@@ -714,12 +714,11 @@ pub fn run() {
                 Some(3) => trigger(&cfg, Mode::LastZone, &tx, &mut pending),
                 Some(4) => open_gallery(&mut gallery, false),
                 Some(5) => open_region(&cfg, &mut region, true),
-                Some(6) => {
-                    if do_pick(&it) && cfg.flash {
+                Some(6)
+                    if do_pick(&it) && cfg.flash => {
                         let _ = tray.set_icon(Some(icon(GREEN)));
                         flash_until = Some(now + Duration::from_millis(600));
                     }
-                }
                 _ => {}
             }
         }

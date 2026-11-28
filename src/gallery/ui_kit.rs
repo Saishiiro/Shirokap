@@ -29,18 +29,17 @@ pub(crate) fn install_fonts_with(ctx: &egui::Context, cjk: bool) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert(
         "Inter".to_owned(),
-        egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-Regular.ttf")).into(),
+        egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-Regular.ttf")),
     );
     fonts.font_data.insert(
         "Inter-SemiBold".to_owned(),
-        egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-SemiBold.ttf")).into(),
+        egui::FontData::from_static(include_bytes!("../../assets/fonts/Inter-SemiBold.ttf")),
     );
     // icônes Lucide : des caractères spéciaux qu'on peut mêler au texte (egui les centre déjà sur la ligne)
     fonts.font_data.insert(
         "Icons".to_owned(),
         egui::FontData::from_static(include_bytes!("../../assets/fonts/Lucide-subset.ttf"))
-            .tweak(egui::FontTweak { scale: 1.0, y_offset_factor: 0.0, y_offset: 0.0, baseline_offset_factor: 0.0 })
-            .into(),
+            .tweak(egui::FontTweak { scale: 1.0, y_offset_factor: 0.0, y_offset: 0.0, baseline_offset_factor: 0.0 }),
     );
     let prop = fonts.families.entry(egui::FontFamily::Proportional).or_default();
     prop.insert(0, "Inter".to_owned());

@@ -341,7 +341,7 @@ impl App {
             let _ = spawn_self(&["--pin", s.as_str()]);
         }
         if cfile {
-            copy_files(&[path.clone()]);
+            copy_files(std::slice::from_ref(&path));
             self.status = ic(icons::COPY, tr("Fichier copié"));
         }
         if annotate {
@@ -365,9 +365,8 @@ impl App {
         }
         // renommage : un champ sous la barre (Entrée pour valider)
         let (mut do_rename, mut cancel) = (None::<String>, false);
-        if self.rename.is_some() {
-            let focus = std::mem::take(&mut self.rename_focus);
-            let buf = &mut self.rename.as_mut().unwrap().1;
+        let focus = std::mem::take(&mut self.rename_focus);
+        if let Some((_, buf)) = self.rename.as_mut() {
             contained(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 8.0;

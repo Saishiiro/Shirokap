@@ -109,8 +109,8 @@ fn blend(img: &mut RgbaImage, x: i32, y: i32, c: [u8; 3], a: f32) {
         return;
     }
     let p = img.get_pixel_mut(x as u32, y as u32);
-    for i in 0..3 {
-        p.0[i] = (p.0[i] as f32 * (1.0 - a) + c[i] as f32 * a) as u8;
+    for (d, &s) in p.0.iter_mut().zip(c.iter()) {
+        *d = (*d as f32 * (1.0 - a) + s as f32 * a) as u8;
     }
 }
 
@@ -224,13 +224,11 @@ fn pixelate(img: &mut RgbaImage, a: Pos2, b: Pos2) {
                     n += 1;
                 }
             }
-            if n > 0 {
+            if let (Some(r), Some(g), Some(bl)) = (r.checked_div(n), g.checked_div(n), bl.checked_div(n)) {
+                let avg = [r as u8, g as u8, bl as u8];
                 for yy in y..ye {
                     for xx in x..xe {
-                        let p = img.get_pixel_mut(xx, yy);
-                        p.0[0] = (r / n) as u8;
-                        p.0[1] = (g / n) as u8;
-                        p.0[2] = (bl / n) as u8;
+                        img.get_pixel_mut(xx, yy).0[..3].copy_from_slice(&avg);
                     }
                 }
             }
@@ -274,6 +272,7 @@ fn fonts_for(text: &str) -> Vec<FontRef<'static>> {
 
 /// `pos` = coin haut-gauche du texte. `bold` = épaisseur simulée en pixels.
 /// Chaque caractère utilise la première police qui le contient.
+#[allow(clippy::too_many_arguments)]
 fn draw_text(img: &mut RgbaImage, fonts: &[FontRef], pos: Pos2, text: &str, size: f32, col: [u8; 3], alpha: f32, bold: i32) {
     let Some(main) = fonts.first() else { return };
     let sf = main.as_scaled(px(main, size));
@@ -360,7 +359,7 @@ fn apply(img: &mut RgbaImage, orig: &RgbaImage, op: &Op) {
         Op::Blur { a, b } => pixelate(img, *a, *b),
         Op::Text { pos, text, col, size } => {
             let fonts = fonts_for(text);
-            let sh = ((*size / 16.0).round() as f32).max(1.0);
+            let sh = (*size / 16.0).round().max(1.0);
             draw_text(img, &fonts, pos2(pos.x + sh, pos.y + sh), text, *size, [0, 0, 0], 0.55, 0); // ombre
             draw_text(img, &fonts, *pos, text, *size, *col, 1.0, 0);
         }

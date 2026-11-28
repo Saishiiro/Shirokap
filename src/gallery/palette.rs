@@ -33,6 +33,9 @@ impl CmdPalette {
     }
 }
 
+/// Une commande de la liste : icône, libellé, raccourci affiché, action.
+type Entry = (&'static str, String, String, Cmd);
+
 /// Groupe d'une commande dans la liste (avec son titre).
 fn group(c: &Cmd) -> usize {
     match c {
@@ -95,8 +98,8 @@ fn norm(s: &str) -> String {
 
 impl App {
     /// Toutes les commandes possibles : (icône, libellé, raccourci affiché, action).
-    fn commands(&self, q: &str) -> Vec<(&'static str, String, String, Cmd)> {
-        let mut v: Vec<(&'static str, String, String, Cmd)> = Vec::new();
+    fn commands(&self, q: &str) -> Vec<Entry> {
+        let mut v: Vec<Entry> = Vec::new();
         let go = tr("Aller à");
         v.push((icons::GALLERY, format!("{go} : {}", tr("Galerie")), String::new(), Cmd::Tab(Tab::Gallery)));
         v.push((icons::STATS, format!("{go} : {}", tr("Statistiques")), String::new(), Cmd::Tab(Tab::Stats)));
@@ -134,7 +137,7 @@ impl App {
         // filtrage : tous les mots tapés doivent apparaître, les libellés qui commencent par le texte d'abord
         let qn = norm(q);
         let words: Vec<&str> = qn.split_whitespace().collect();
-        let mut out: Vec<(usize, (&'static str, String, String, Cmd))> = v
+        let mut out: Vec<(usize, Entry)> = v
             .into_iter()
             .filter_map(|c| {
                 let l = norm(&c.1);

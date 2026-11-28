@@ -47,7 +47,7 @@ impl Default for Zoom {
 }
 
 fn fit_scale(area: Rect, img: Vec2) -> f32 {
-    (area.width() / img.x).min(area.height() / img.y).min(1.0).max(MIN)
+    (area.width() / img.x).min(area.height() / img.y).clamp(MIN, 1.0)
 }
 
 /// Décalage ramené dans les limites : une image plus petite que la zone reste centrée,
@@ -98,6 +98,7 @@ impl Zoom {
 
     /// Gère la molette, le glisser, le double-clic et le clavier dans `area` (dont `resp` est la réponse),
     /// pour une image de taille `img` (en pixels). Renvoie le rectangle de l'image à l'écran.
+    #[allow(clippy::too_many_arguments)]
     pub fn update(&mut self, ui: &egui::Ui, resp: &Response, area: Rect, img: Vec2, pan: Pan, keys: bool, dbl: bool) -> Rect {
         let ctx = ui.ctx().clone();
         let fit_s = fit_scale(area, img);

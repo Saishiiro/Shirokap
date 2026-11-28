@@ -456,7 +456,7 @@ pub fn list_items(root: &str) -> Vec<Item> {
             }
         }
     }
-    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    out.sort_by_key(|i| std::cmp::Reverse(i.modified));
     out
 }
 
@@ -525,7 +525,7 @@ pub fn load_last_region() -> Option<(u32, u32, u32, u32, i32, i32)> {
 
 pub fn is_blocked(list: &str, title: &str) -> bool {
     let t = title.to_lowercase();
-    list.split(|c| c == ',' || c == ';')
+    list.split([',', ';'])
         .map(|s| s.trim().to_lowercase())
         .any(|s| !s.is_empty() && t.contains(&s))
 }
