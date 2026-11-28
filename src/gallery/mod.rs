@@ -798,9 +798,10 @@ impl eframe::App for App {
         }
         let foc = ctx.input(|i| i.focused);
         // galerie au premier plan : pleine vitesse (fluidité) ; en arrière-plan ou réduite : mode efficacité
+        // (la feuille verte du gestionnaire des tâches)
         if self.eco != Some(!foc) {
             self.eco = Some(!foc);
-            set_efficiency(!foc);
+            set_background_mode(!foc);
         }
         if foc && !self.focused {
             self.items = list_items(&self.cfg.save_dir); // nouvelles captures au retour sur la fenêtre

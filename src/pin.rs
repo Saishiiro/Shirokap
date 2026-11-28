@@ -4,12 +4,12 @@ struct Pin {
     tex: egui::TextureHandle,
     size: egui::Vec2,
     scale: f32,
+    eco: Option<bool>, // mode efficacité en cours (vrai quand la fenêtre n'a pas le focus)
 }
 
 /// Fenêtre flottante, toujours au premier plan, qui affiche une capture (référence, carte, tuto…).
 /// Glisser = déplacer · molette = taille · clic droit ou Échap = fermer.
 pub fn run(path: String) {
-    crate::common::set_efficiency(true); // capture épinglée : elle ne fait qu'afficher une image
     let Ok(img) = image::open(&path) else { return };
     let img = img.to_rgba8();
     let size = egui::vec2(img.width() as f32, img.height() as f32);
@@ -31,13 +31,20 @@ pub fn run(path: String) {
                 img.as_raw(),
             );
             let tex = cc.egui_ctx.load_texture("pin", ci, Default::default());
-            Ok(Box::new(Pin { tex, size, scale }))
+            Ok(Box::new(Pin { tex, size, scale, eco: None }))
         }),
     );
 }
 
 impl eframe::App for Pin {
     fn update(&mut self, ctx: &egui::Context, _f: &mut eframe::Frame) {
+        // capture épinglée : elle ne fait qu'afficher une image, donc mode efficacité (feuille verte) ;
+        // pleine vitesse le temps qu'on la déplace ou la redimensionne
+        let foc = ctx.input(|i| i.focused);
+        if self.eco != Some(!foc) {
+            self.eco = Some(!foc);
+            crate::common::set_background_mode(!foc);
+        }
         let (pressed, scroll, esc, rclick) = ctx.input(|i| {
             (
                 i.pointer.primary_pressed(),

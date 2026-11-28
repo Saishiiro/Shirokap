@@ -61,10 +61,24 @@ pub struct Config {
     pub slide_secs: u32,        // durée d'affichage de chaque image du diaporama (secondes)
 }
 
+/// Mode « efficacité » complet, celui du gestionnaire des tâches (la feuille verte) : économie d'énergie
+/// (`set_efficiency`) et priorité basse. Pour les fenêtres qui ne font qu'afficher quand on ne s'en sert
+/// pas (capture épinglée, galerie en arrière-plan) ; `false` rend la pleine vitesse quand on y revient.
+/// Pas pour le processus du tray : en priorité basse, il pourrait réagir en retard aux raccourcis quand
+/// un jeu occupe tout le processeur.
+pub fn set_background_mode(on: bool) {
+    use windows_sys::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass, IDLE_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS};
+    set_efficiency(on);
+    unsafe {
+        SetPriorityClass(GetCurrentProcess(), if on { IDLE_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS });
+    }
+}
+
 /// Mode économie d'énergie de Windows 11 (« EcoQoS ») : quand il est actif, Windows fait tourner le
 /// processus sur des cœurs moins rapides et plus économes. La feuille « Mode efficacité » du gestionnaire
-/// des tâches n'apparaît pas : elle demande en plus une priorité basse, qu'on évite pour que le tray
-/// réagisse tout de suite aux raccourcis même quand un jeu occupe le processeur.
+/// des tâches n'apparaît pas : elle demande en plus une priorité basse (voir `set_background_mode`),
+/// qu'on évite pour le tray afin qu'il réagisse tout de suite aux raccourcis même quand un jeu occupe
+/// le processeur.
 /// Idéal pour ce qui travaille en arrière-plan ; sans effet (et sans erreur) sur les anciennes versions de Windows.
 pub fn set_efficiency(on: bool) {
     use windows_sys::Win32::System::Threading::{

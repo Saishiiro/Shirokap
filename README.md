@@ -156,6 +156,19 @@ src/
     ui_kit.rs    themes, palettes and interface components
     palette.rs   command palette (Ctrl+K)
     hotkeys.rs   hotkey recorder
+    form.rs      settings rows, switches, fields, buttons
+    welcome.rs   welcome screen
+tools/
+  build-icons.py rebuilds the icon font (assets/fonts/Lucide-subset.ttf)
+```
+
+### Adding an icon
+
+The icon font only holds the Lucide icons listed in `src/icons.rs`. Add a line at the end of that file (next character, icon name from [lucide.dev/icons](https://lucide.dev/icons) as a comment), then rebuild the font with Python 3 and `fonttools`:
+
+```
+npm pack lucide-static@1.81.0 && tar xzf lucide-static-1.81.0.tgz
+python tools/build-icons.py package
 ```
 
 ### Changelog
@@ -317,6 +330,19 @@ src/
     ui_kit.rs    thèmes, palettes et composants d'interface
     palette.rs   palette de commandes (Ctrl+K)
     hotkeys.rs   enregistreur de raccourci
+    form.rs      lignes des paramètres, interrupteurs, champs, boutons
+    welcome.rs   écran d'accueil
+tools/
+  build-icons.py reconstruit la police d'icônes (assets/fonts/Lucide-subset.ttf)
+```
+
+### Ajouter une icône
+
+La police d'icônes ne contient que les icônes Lucide listées dans `src/icons.rs`. Ajoute une ligne à la fin de ce fichier (caractère suivant, nom de l'icône pris sur [lucide.dev/icons](https://lucide.dev/icons) en commentaire), puis reconstruis la police avec Python 3 et `fonttools` :
+
+```
+npm pack lucide-static@1.81.0 && tar xzf lucide-static-1.81.0.tgz
+python tools/build-icons.py package
 ```
 
 ### Historique
